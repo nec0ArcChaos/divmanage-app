@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useForm, usePage } from '@inertiajs/vue3';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import { Bell, Menu, Search, Settings, LogOut } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { getInitials } from '@/composables/useInitials';
@@ -68,9 +68,11 @@ const handleLogout = () => form.post(logout().url);
                         </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem class="cursor-pointer gap-2 text-[13px]">
-                        <Settings class="size-[14px] text-gray-400" />
-                        Profile Settings
+                    <DropdownMenuItem as-child>
+                        <Link href="/settings/profile" class="flex cursor-pointer items-center gap-2 text-[13px]">
+                            <Settings class="size-[14px] text-gray-400" />
+                            Profile Settings
+                        </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

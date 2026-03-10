@@ -71,14 +71,16 @@ class DashboardController extends Controller
             ->where('deadline', '<', $lastWeek->toDateString())
             ->count();
 
-        // Completed this week
+        // Completed this week — gunakan completed_at (seeder sudah set rand 1-15 hari lalu)
         $completedThisWeek = Task::whereHas('project', fn ($q) => $q->where('workspace_id', $workspaceId))
             ->whereIn('task_status_id', $doneStatusIds)
-            ->where('updated_at', '>=', $lastWeek)
+            ->whereNotNull('completed_at')
+            ->where('completed_at', '>=', $lastWeek)
             ->count();
         $completedLastWeek = Task::whereHas('project', fn ($q) => $q->where('workspace_id', $workspaceId))
             ->whereIn('task_status_id', $doneStatusIds)
-            ->whereBetween('updated_at', [$twoWeeks, $lastWeek])
+            ->whereNotNull('completed_at')
+            ->whereBetween('completed_at', [$twoWeeks, $lastWeek])
             ->count();
 
         return [
