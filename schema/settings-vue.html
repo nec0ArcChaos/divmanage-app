@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProjectHub — Settings</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --brand-50: #eef4ff; --brand-100: #d9e6ff; --brand-200: #bcd4ff;
+      --brand-400: #5994ff; --brand-500: #3b6ff8; --brand-600: #2150ed; --brand-700: #1a3dd9;
+      --s0: #ffffff; --s50: #f8f9fb; --s100: #f1f3f6; --s200: #e5e8ed;
+      --s300: #d1d6de; --s400: #9ca3b0; --s500: #6b7280; --s600: #4b5563;
+      --s700: #374151; --s800: #1f2937; --s900: #111827;
+    }
+    [v-cloak] { display: none; }
+    html, body { height: 100%; }
+    body { font-family: 'DM Sans', system-ui, -apple-system, sans-serif; background: var(--s50); color: var(--s800); -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.5; }
+
+    .content-inner { max-width: 1200px; margin: 0 auto; padding: 28px 32px; }
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 16px; }
+    .page-header h1 { font-size: 24px; font-weight: 700; color: var(--s900); letter-spacing: -0.5px; line-height: 1.2; }
+    .page-header p { margin-top: 4px; font-size: 14px; color: var(--s500); }
+
+    .settings-layout { display: grid; grid-template-columns: 220px 1fr; gap: 32px; }
+    .settings-nav { position: sticky; top: 28px; align-self: start; }
+    .settings-nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 500; color: var(--s500); cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: inherit; transition: all 0.15s ease; margin-bottom: 2px; }
+    .settings-nav-item:hover { background: var(--s100); color: var(--s800); }
+    .settings-nav-item.active { background: var(--brand-50); color: var(--brand-700); font-weight: 600; }
+    .settings-nav-item svg { flex-shrink: 0; }
+
+    .card { background: var(--s0); border: 1px solid var(--s200); border-radius: 12px; overflow: hidden; margin-bottom: 24px; }
+    .card:last-child { margin-bottom: 0; }
+    .card-header { padding: 20px 24px; border-bottom: 1px solid var(--s100); }
+    .card-header-flex { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--s100); }
+    .card-title { font-size: 16px; font-weight: 600; color: var(--s900); }
+    .card-subtitle { font-size: 13px; color: var(--s400); margin-top: 2px; }
+    .card-body { padding: 24px; }
+
+    .form-group { margin-bottom: 20px; }
+    .form-group:last-child { margin-bottom: 0; }
+    .form-label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--s700); }
+    .form-hint { font-size: 12px; color: var(--s400); margin-top: 4px; }
+    .form-input { width: 100%; height: 40px; border: 1px solid var(--s200); border-radius: 8px; background: var(--s0); padding: 0 14px; font-size: 14px; font-family: inherit; color: var(--s800); outline: none; transition: all 0.15s ease; }
+    .form-input::placeholder { color: var(--s400); }
+    .form-input:hover { border-color: var(--s300); }
+    .form-input:focus { border-color: var(--brand-500); box-shadow: 0 0 0 3px var(--brand-50); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-select { width: 100%; height: 40px; border: 1px solid var(--s200); border-radius: 8px; background: var(--s0); padding: 0 32px 0 14px; font-size: 14px; font-family: inherit; color: var(--s600); outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3b0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; transition: all 0.15s ease; }
+    .form-select:hover { border-color: var(--s300); }
+    .form-select:focus { border-color: var(--brand-500); box-shadow: 0 0 0 3px var(--brand-50); }
+
+    .avatar-upload { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+    .avatar-preview { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, var(--brand-400), var(--brand-600)); color: #fff; font-size: 22px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+    .btn-primary { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border-radius: 8px; border: none; background: var(--brand-600); color: #fff; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 1px 3px rgba(33,80,237,0.2); }
+    .btn-primary:hover { background: var(--brand-700); }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary-sm { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 8px; border: none; background: var(--brand-600); color: #fff; font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; }
+    .btn-primary-sm:hover { background: var(--brand-700); }
+    .btn-ghost { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--s200); background: var(--s0); font-size: 12.5px; font-weight: 500; font-family: inherit; color: var(--s600); cursor: pointer; transition: all 0.15s ease; }
+    .btn-ghost:hover { background: var(--s50); border-color: var(--s300); }
+    .btn-sm { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--s200); background: var(--s0); font-size: 12px; font-weight: 500; font-family: inherit; color: var(--s600); cursor: pointer; transition: all 0.12s ease; }
+    .btn-sm:hover { background: var(--brand-50); border-color: var(--brand-200); color: var(--brand-700); }
+    .btn-sm-danger { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid #fecaca; background: var(--s0); font-size: 12px; font-weight: 500; font-family: inherit; color: #b91c1c; cursor: pointer; transition: all 0.12s ease; }
+    .btn-sm-danger:hover { background: #fef2f2; }
+
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--s50); }
+    .toggle-row:last-child { border-bottom: none; }
+    .toggle-info { min-width: 0; flex: 1; }
+    .toggle-label { font-size: 14px; font-weight: 500; color: var(--s800); }
+    .toggle-desc { font-size: 12.5px; color: var(--s400); margin-top: 2px; }
+    .toggle-switch { width: 44px; height: 24px; border-radius: 12px; background: var(--s300); position: relative; cursor: pointer; transition: background 0.2s ease; flex-shrink: 0; border: none; }
+    .toggle-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+    .toggle-switch.on { background: var(--brand-600); }
+    .toggle-switch.on::after { transform: translateX(20px); }
+
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; }
+    .badge-admin { background: #fef2f2; color: #b91c1c; outline: 1px solid #fecaca; }
+    .badge-pm { background: #f5f3ff; color: #6d28d9; outline: 1px solid #ddd6fe; }
+    .badge-member { background: #eff6ff; color: #1d4ed8; outline: 1px solid #bfdbfe; }
+    .badge-active { background: #ecfdf5; color: #047857; outline: 1px solid #a7f3d0; }
+    .badge-pending { background: #fffbeb; color: #b45309; outline: 1px solid #fde68a; }
+
+    .status-flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+    .status-chip { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--s200); background: var(--s0); color: var(--s600); }
+    .status-chip-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .flow-arrow { color: var(--s300); flex-shrink: 0; }
+    .priority-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .priority-chip { padding: 6px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; }
+    .priority-chip.selected { outline-width: 2px; }
+    .p-low { background: var(--s100); color: var(--s500); outline: 1px solid var(--s200); }
+    .p-medium { background: #eff6ff; color: #1d4ed8; outline: 1px solid #bfdbfe; }
+    .p-high { background: #fff7ed; color: #c2410c; outline: 1px solid #fed7aa; }
+    .p-urgent { background: #fef2f2; color: #b91c1c; outline: 1px solid #fecaca; }
+
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th { padding: 10px 20px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--s400); border-bottom: 1px solid var(--s100); }
+    .data-table td { padding: 12px 20px; font-size: 13.5px; vertical-align: middle; }
+    .data-table tbody tr { border-bottom: 1px solid var(--s50); transition: background 0.1s ease; }
+    .data-table tbody tr:hover { background: rgba(248,249,251,0.6); }
+    .data-table tbody tr:last-child { border-bottom: none; }
+    .member-cell { display: flex; align-items: center; gap: 10px; }
+    .member-avatar { width: 32px; height: 32px; border-radius: 50%; font-size: 12px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .member-name { font-size: 13.5px; font-weight: 500; color: var(--s800); }
+    .member-email-sm { font-size: 12px; color: var(--s400); }
+    .actions-cell { display: flex; align-items: center; gap: 6px; }
+
+    .bg-violet { background: #8b5cf6; } .bg-sky { background: #0ea5e9; } .bg-amber { background: #f59e0b; } .bg-emerald { background: #10b981; } .bg-brand { background: var(--brand-500); }
+
+    .section-divider { height: 1px; background: var(--s100); margin: 20px 0; }
+
+    .fade-in { animation: fadeIn 0.4s ease forwards; opacity: 0; transform: translateY(8px); }
+    @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 900px) { .settings-layout { grid-template-columns: 1fr; } .settings-nav { position: static; display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 24px; } .settings-nav-item { flex: 0 0 auto; margin-bottom: 0; } .content-inner { padding: 20px 16px; } .form-row { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) { .page-header { flex-direction: column; align-items: flex-start; } }
+  </style>
+</head>
+<body>
+
+<div id="app" v-cloak>
+<div class="content-inner">
+
+  <!-- PAGE HEADER -->
+  <div class="page-header fade-in" style="animation-delay:0.05s">
+    <div><h1>Settings</h1><p>Manage your workspace, account, and application preferences</p></div>
+  </div>
+
+  <div class="settings-layout">
+
+    <!-- SETTINGS NAV — <settings-sidebar> -->
+    <nav class="settings-nav fade-in" style="animation-delay:0.08s">
+      <button
+        v-for="tab in settingsTabs" :key="tab.key"
+        :class="['settings-nav-item', { active: activeTab === tab.key }]"
+        @click="activeTab = tab.key"
+        v-html="tab.icon + ' ' + tab.label"
+      ></button>
+    </nav>
+
+    <!-- SETTINGS CONTENT -->
+    <div class="settings-content">
+
+      <!-- PROFILE — <profile-settings> -->
+      <div v-show="activeTab === 'profile'" class="card fade-in" style="animation-delay:0.1s">
+        <div class="card-header"><div class="card-title">Profile Information</div><div class="card-subtitle">Update your personal details</div></div>
+        <div class="card-body">
+          <div class="avatar-upload">
+            <div class="avatar-preview">{{ profile.initials }}</div>
+            <div><button class="btn-ghost">Upload Photo</button><div class="form-hint" style="margin-top:4px;">JPG, PNG, max 2MB</div></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" type="text" v-model="profile.name" /></div>
+            <div class="form-group"><label class="form-label">Email Address</label><input class="form-input" type="email" v-model="profile.email" /></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Job Title</label><input class="form-input" type="text" v-model="profile.title" /></div>
+            <div class="form-group"><label class="form-label">Department</label><input class="form-input" type="text" v-model="profile.department" /></div>
+          </div>
+          <div class="section-divider"></div>
+          <div style="display:flex;gap:12px;">
+            <button class="btn-primary" @click="handleSave('Profile')">Save Changes</button>
+            <button class="btn-ghost" @click="handleAction('Change Password')">Change Password</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- WORKSPACE — <workspace-settings> -->
+      <div v-show="activeTab === 'workspace'" class="card fade-in" style="animation-delay:0.1s">
+        <div class="card-header"><div class="card-title">Workspace Settings</div><div class="card-subtitle">Configure your organization workspace</div></div>
+        <div class="card-body">
+          <div class="avatar-upload">
+            <div class="avatar-preview" style="border-radius:12px;background:var(--brand-600);font-size:18px;">PH</div>
+            <div><button class="btn-ghost">Upload Logo</button><div class="form-hint" style="margin-top:4px;">Square image, min 128×128px</div></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Workspace Name</label><input class="form-input" type="text" v-model="workspace.name" /></div>
+            <div class="form-group"><label class="form-label">Workspace URL</label><input class="form-input" type="text" v-model="workspace.slug" /><span class="form-hint">projecthub.company.co.id/{{ workspace.slug }}</span></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Timezone</label><select class="form-select" v-model="workspace.timezone"><option>Asia/Jakarta (WIB, UTC+7)</option><option>Asia/Makassar (WITA, UTC+8)</option><option>Asia/Jayapura (WIT, UTC+9)</option></select></div>
+            <div class="form-group"><label class="form-label">Date Format</label><select class="form-select" v-model="workspace.dateFormat"><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select></div>
+          </div>
+          <div class="section-divider"></div>
+          <button class="btn-primary" @click="handleSave('Workspace')">Save Workspace Settings</button>
+        </div>
+      </div>
+
+      <!-- USERS & ROLES — <user-role-management> -->
+      <div v-show="activeTab === 'users'" class="card fade-in" style="animation-delay:0.1s">
+        <div class="card-header-flex">
+          <div><div class="card-title">User Role Management</div><div class="card-subtitle">Manage team member access and permissions</div></div>
+          <button class="btn-primary-sm" @click="handleAction('Invite Member')">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+            Invite Member
+          </button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              <tr v-for="u in users" :key="u.id">
+                <td><div class="member-cell"><div :class="['member-avatar', u.avatarColor]">{{ u.initials }}</div><div><div class="member-name">{{ u.name }}</div><div class="member-email-sm">{{ u.email }}</div></div></div></td>
+                <td><span :class="['badge', roleBadge(u.role)]">{{ u.role }}</span></td>
+                <td><span :class="['badge', u.status === 'Active' ? 'badge-active' : 'badge-pending']">{{ u.status }}</span></td>
+                <td><div class="actions-cell"><button class="btn-sm" @click="handleAction('Edit Role: ' + u.name)">Edit Role</button><button v-if="u.role !== 'Admin'" class="btn-sm-danger" @click="handleAction('Remove: ' + u.name)">Remove</button></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PROJECT DEFAULTS — <project-defaults> -->
+      <div v-show="activeTab === 'defaults'" class="card fade-in" style="animation-delay:0.1s">
+        <div class="card-header"><div class="card-title">Default Project Configuration</div><div class="card-subtitle">Set default workflow and priority for new projects</div></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Default Task Status Workflow</label>
+            <span class="form-hint" style="margin-bottom:10px;display:block;">Statuses applied to new projects in this order</span>
+            <div class="status-flow">
+              <template v-for="(s, i) in statusWorkflow" :key="s.label">
+                <div class="status-chip"><span class="status-chip-dot" :style="{ background: s.color }"></span>{{ s.label }}</div>
+                <svg v-if="i < statusWorkflow.length - 1" class="flow-arrow" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+              </template>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Default Task Priority</label>
+            <div class="priority-chips">
+              <span v-for="p in priorities" :key="p.label" :class="['priority-chip', p.cls, { selected: defaultPriority === p.label }]" @click="defaultPriority = p.label" style="cursor:pointer;">{{ p.label }}</span>
+            </div>
+          </div>
+          <div class="section-divider"></div>
+          <button class="btn-primary" @click="handleSave('Project Defaults')">Save Defaults</button>
+        </div>
+      </div>
+
+      <!-- NOTIFICATIONS — <notification-settings> -->
+      <div v-show="activeTab === 'notifications'" class="card fade-in" style="animation-delay:0.1s">
+        <div class="card-header"><div class="card-title">Notification Preferences</div><div class="card-subtitle">Choose what notifications you receive</div></div>
+        <div class="card-body">
+          <div v-for="n in notifications" :key="n.key" class="toggle-row">
+            <div class="toggle-info"><div class="toggle-label">{{ n.label }}</div><div class="toggle-desc">{{ n.desc }}</div></div>
+            <button :class="['toggle-switch', { on: n.enabled }]" @click="n.enabled = !n.enabled"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECURITY — <security-settings> -->
+      <div v-show="activeTab === 'security'" class="card fade-in" style="animation-delay:0.1s">
+        <div class="card-header"><div class="card-title">Security</div><div class="card-subtitle">Manage password and authentication settings</div></div>
+        <div class="card-body">
+          <div class="toggle-row">
+            <div class="toggle-info"><div class="toggle-label">Change Password</div><div class="toggle-desc">Update your account password regularly for security</div></div>
+            <button class="btn-ghost" @click="handleAction('Change Password')">Change Password</button>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info"><div class="toggle-label">Two-Factor Authentication</div><div class="toggle-desc">Add an extra layer of security to your account</div></div>
+            <button :class="['toggle-switch', { on: twoFactorEnabled }]" @click="twoFactorEnabled = !twoFactorEnabled"></button>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info"><div class="toggle-label">Login Activity</div><div class="toggle-desc">Review recent login sessions and devices</div></div>
+            <button class="btn-ghost" @click="handleAction('View Login Activity')">View Activity</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <div style="height:32px;"></div>
+</div>
+</div>
+
+<script>
+const { createApp, ref, reactive } = Vue
+
+createApp({
+  setup() {
+    const activeTab = ref('profile')
+
+    const settingsTabs = [
+      { key: 'profile', label: 'Profile', icon: '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>' },
+      { key: 'workspace', label: 'Workspace', icon: '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 4.5H21"/></svg>' },
+      { key: 'users', label: 'Users & Roles', icon: '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>' },
+      { key: 'defaults', label: 'Project Defaults', icon: '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"/></svg>' },
+      { key: 'notifications', label: 'Notifications', icon: '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>' },
+      { key: 'security', label: 'Security', icon: '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>' },
+    ]
+
+    // Profile
+    const profile = reactive({ name: 'Andi Rahmat', email: 'andi@company.co.id', title: 'IT Division Lead', department: 'Information Technology', initials: 'AR' })
+
+    // Workspace
+    const workspace = reactive({ name: 'ProjectHub — IT Division', slug: 'projecthub-it', timezone: 'Asia/Jakarta (WIB, UTC+7)', dateFormat: 'DD/MM/YYYY' })
+
+    // Users
+    const users = ref([
+      { id: 1, name: 'Andi Rahmat', initials: 'AR', avatarColor: 'bg-brand', email: 'andi@company.co.id', role: 'Admin', status: 'Active' },
+      { id: 2, name: 'Budi Santoso', initials: 'BS', avatarColor: 'bg-violet', email: 'budi@company.co.id', role: 'Project Manager', status: 'Active' },
+      { id: 3, name: 'Dina Permata', initials: 'DP', avatarColor: 'bg-sky', email: 'dina@company.co.id', role: 'Project Manager', status: 'Active' },
+      { id: 4, name: 'Fajar Hidayat', initials: 'FH', avatarColor: 'bg-amber', email: 'fajar@company.co.id', role: 'Member', status: 'Active' },
+      { id: 5, name: 'Rina Wulandari', initials: 'RW', avatarColor: 'bg-emerald', email: 'rina@company.co.id', role: 'Member', status: 'Pending' },
+    ])
+
+    const roleBadge = (role) => ({ 'Admin': 'badge-admin', 'Project Manager': 'badge-pm', 'Member': 'badge-member' }[role] || 'badge-member')
+
+    // Project defaults
+    const statusWorkflow = [
+      { label: 'Backlog', color: 'var(--s400)' }, { label: 'To Do', color: 'var(--s600)' },
+      { label: 'In Progress', color: '#2563eb' }, { label: 'Code Review', color: '#7c3aed' },
+      { label: 'Testing', color: '#a21caf' }, { label: 'Done', color: '#059669' },
+    ]
+    const priorities = [
+      { label: 'Low', cls: 'p-low' }, { label: 'Medium', cls: 'p-medium' },
+      { label: 'High', cls: 'p-high' }, { label: 'Urgent', cls: 'p-urgent' },
+    ]
+    const defaultPriority = ref('Medium')
+
+    // Notifications
+    const notifications = reactive([
+      { key: 'email', label: 'Email Notifications', desc: 'Receive email updates for important activity', enabled: true },
+      { key: 'assign', label: 'Task Assignment Alerts', desc: 'Get notified when a task is assigned to you', enabled: true },
+      { key: 'deadline', label: 'Deadline Reminders', desc: 'Receive reminders 24h before task deadlines', enabled: true },
+      { key: 'project', label: 'Project Updates', desc: 'Get notified about project milestone changes', enabled: false },
+    ])
+
+    // Security
+    const twoFactorEnabled = ref(false)
+
+    // Handlers
+    const handleSave = (section) => alert(`${section} settings saved successfully!`)
+    const handleAction = (action) => alert(`Action: ${action} — integrate with your modal/service`)
+
+    return {
+      activeTab, settingsTabs,
+      profile, workspace,
+      users, roleBadge,
+      statusWorkflow, priorities, defaultPriority,
+      notifications, twoFactorEnabled,
+      handleSave, handleAction,
+    }
+  }
+}).mount('#app')
+</script>
+</body>
+</html>

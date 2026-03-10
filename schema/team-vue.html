@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProjectHub — Team</title>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand-50: #eef4ff; --brand-100: #d9e6ff; --brand-200: #bcd4ff;
+      --brand-400: #5994ff; --brand-500: #3b6ff8; --brand-600: #2150ed; --brand-700: #1a3dd9;
+      --s0: #ffffff; --s50: #f8f9fb; --s100: #f1f3f6; --s200: #e5e8ed;
+      --s300: #d1d6de; --s400: #9ca3b0; --s500: #6b7280; --s600: #4b5563;
+      --s700: #374151; --s800: #1f2937; --s900: #111827;
+    }
+
+    [v-cloak] { display: none; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+      background: var(--s50); color: var(--s800);
+      -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.5;
+    }
+
+    .content-inner { max-width: 1200px; margin: 0 auto; padding: 28px 32px; }
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 16px; }
+    .page-header h1 { font-size: 24px; font-weight: 700; color: var(--s900); letter-spacing: -0.5px; line-height: 1.2; }
+    .page-header p { margin-top: 4px; font-size: 14px; color: var(--s500); }
+
+    .btn-primary { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border-radius: 8px; border: none; background: var(--brand-600); color: #fff; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 1px 3px rgba(33,80,237,0.2); }
+    .btn-primary:hover { background: var(--brand-700); box-shadow: 0 4px 12px rgba(33,80,237,0.25); }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-ghost { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--s200); background: var(--s0); font-size: 12.5px; font-weight: 500; font-family: inherit; color: var(--s600); cursor: pointer; transition: all 0.15s ease; }
+    .btn-ghost:hover { background: var(--s50); border-color: var(--s300); }
+    .btn-view { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--s200); background: var(--s0); font-size: 12px; font-weight: 500; font-family: inherit; color: var(--s600); cursor: pointer; transition: all 0.12s ease; }
+    .btn-view:hover { background: var(--brand-50); border-color: var(--brand-200); color: var(--brand-700); }
+    .btn-dots { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--s200); background: var(--s0); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--s400); transition: all 0.12s ease; }
+    .btn-dots:hover { background: var(--s100); color: var(--s600); }
+
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; }
+    .badge-admin { background: #fef2f2; color: #b91c1c; outline: 1px solid #fecaca; }
+    .badge-pm { background: #f5f3ff; color: #6d28d9; outline: 1px solid #ddd6fe; }
+    .badge-dev { background: #eff6ff; color: #1d4ed8; outline: 1px solid #bfdbfe; }
+    .badge-qa { background: #fffbeb; color: #b45309; outline: 1px solid #fde68a; }
+    .badge-active { background: #ecfdf5; color: #047857; outline: 1px solid #a7f3d0; }
+    .badge-onleave { background: #fffbeb; color: #b45309; outline: 1px solid #fde68a; }
+    .badge-inactive { background: var(--s100); color: var(--s500); outline: 1px solid var(--s200); }
+
+    .icon-bg-brand { background: var(--brand-50); color: var(--brand-600); }
+    .icon-bg-blue { background: #eff6ff; color: #2563eb; }
+    .icon-bg-amber { background: #fffbeb; color: #d97706; }
+    .icon-bg-violet { background: #f5f3ff; color: #7c3aed; }
+
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    .stat-card { background: var(--s0); border: 1px solid var(--s200); border-radius: 12px; padding: 20px; transition: box-shadow 0.2s ease, transform 0.2s ease; }
+    .stat-card:hover { box-shadow: 0 4px 24px -4px rgba(0,0,0,0.07); transform: translateY(-1px); }
+    .stat-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .stat-label { font-size: 12.5px; font-weight: 500; color: var(--s400); }
+    .stat-value { font-size: 28px; font-weight: 700; color: var(--s900); letter-spacing: -1px; margin-top: 6px; line-height: 1; }
+    .stat-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stat-trend { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+    .trend-badge { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 600; }
+    .trend-up { color: #059669; }
+    .trend-text { font-size: 12px; color: var(--s400); }
+
+    /* Filter */
+    .filter-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    .filter-search { position: relative; flex: 1; min-width: 200px; max-width: 320px; }
+    .filter-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--s400); }
+    .filter-search input { width: 100%; height: 36px; border: 1px solid var(--s200); border-radius: 8px; background: var(--s0); padding: 0 14px 0 36px; font-size: 13px; font-family: inherit; color: var(--s700); outline: none; transition: all 0.15s ease; }
+    .filter-search input::placeholder { color: var(--s400); }
+    .filter-search input:focus { border-color: var(--brand-200); background: #fff; box-shadow: 0 0 0 3px var(--brand-50); }
+    .filter-select { height: 36px; border: 1px solid var(--s200); border-radius: 8px; background: var(--s0); padding: 0 32px 0 12px; font-size: 13px; font-family: inherit; color: var(--s600); outline: none; cursor: pointer; transition: all 0.15s ease; appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3b0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+    .filter-select:hover { border-color: var(--s300); }
+    .filter-select:focus { border-color: var(--brand-200); box-shadow: 0 0 0 3px var(--brand-50); }
+    .filter-count { font-size: 12.5px; color: var(--s400); margin-left: auto; }
+    .filter-count strong { color: var(--s700); font-weight: 600; }
+
+    /* Table */
+    .card { background: var(--s0); border: 1px solid var(--s200); border-radius: 12px; overflow: hidden; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--s100); }
+    .card-title { font-size: 15px; font-weight: 600; color: var(--s900); }
+    .card-subtitle { font-size: 12.5px; color: var(--s400); margin-top: 2px; }
+    .team-table { width: 100%; border-collapse: collapse; }
+    .team-table th { padding: 10px 20px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--s400); border-bottom: 1px solid var(--s100); white-space: nowrap; }
+    .team-table td { padding: 14px 20px; font-size: 13.5px; vertical-align: middle; }
+    .team-table tbody tr { border-bottom: 1px solid var(--s50); transition: background 0.1s ease; }
+    .team-table tbody tr:hover { background: rgba(248,249,251,0.6); }
+    .team-table tbody tr:last-child { border-bottom: none; }
+    .member-cell { display: flex; align-items: center; gap: 12px; }
+    .member-avatar { width: 36px; height: 36px; border-radius: 50%; font-size: 13px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .member-name { font-size: 13.5px; font-weight: 600; color: var(--s800); }
+    .member-username { font-size: 12px; color: var(--s400); margin-top: 1px; }
+    .member-email { font-size: 13px; color: var(--s500); }
+    .projects-count { font-size: 13px; color: var(--s600); }
+    .project-tags { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+    .project-tag { font-size: 10.5px; font-weight: 500; padding: 1px 6px; border-radius: 4px; background: var(--s100); color: var(--s500); }
+    .actions-cell { display: flex; align-items: center; gap: 6px; }
+    .empty-row { text-align: center; padding: 48px 20px; color: var(--s400); font-size: 13px; }
+
+    /* Assignments */
+    .assignment-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--s50); transition: background 0.1s ease; }
+    .assignment-item:last-child { border-bottom: none; }
+    .assignment-item:hover { background: rgba(248,249,251,0.6); }
+    .assignment-project { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .assignment-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .assignment-name { font-size: 14px; font-weight: 600; color: var(--s800); }
+    .assignment-count { font-size: 12px; color: var(--s400); margin-top: 1px; }
+    .avatar-stack { display: flex; align-items: center; }
+    .avatar-stack-item { width: 32px; height: 32px; border-radius: 50%; font-size: 11px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; border: 2px solid var(--s0); margin-left: -8px; }
+    .avatar-stack-item:first-child { margin-left: 0; }
+    .avatar-stack-overflow { width: 32px; height: 32px; border-radius: 50%; background: var(--s100); color: var(--s500); font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; border: 2px solid var(--s0); margin-left: -8px; }
+
+    .fade-in { animation: fadeIn 0.4s ease forwards; opacity: 0; transform: translateY(8px); }
+    @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } .content-inner { padding: 20px 16px; } .team-table th, .team-table td { padding: 10px 12px; } }
+    @media (max-width: 640px) { .stats-grid { grid-template-columns: 1fr; } .page-header { flex-direction: column; align-items: flex-start; } .filter-bar { flex-direction: column; align-items: stretch; } .filter-search { max-width: none; } .filter-count { margin-left: 0; } }
+  </style>
+</head>
+
+<body>
+
+<div id="app" v-cloak>
+<div class="content-inner">
+
+  <!-- ================================================================ -->
+  <!-- PAGE HEADER                                                      -->
+  <!-- ================================================================ -->
+  <div class="page-header fade-in" style="animation-delay:0.05s">
+    <div>
+      <h1>Team</h1>
+      <p>Manage and view members of the IT division</p>
+    </div>
+    <button class="btn-primary" @click="handleAddMember">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z"/></svg>
+      Add Member
+    </button>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- TEAM SUMMARY — <team-summary>                                    -->
+  <!-- ================================================================ -->
+  <div class="stats-grid">
+    <div v-for="(stat, i) in summaryStats" :key="stat.label" class="stat-card fade-in" :style="{ animationDelay: (0.05 + i * 0.05) + 's' }">
+      <div class="stat-card-top">
+        <div><div class="stat-label">{{ stat.label }}</div><div class="stat-value">{{ stat.value }}</div></div>
+        <div :class="['stat-icon', stat.iconBg]" v-html="stat.icon"></div>
+      </div>
+      <div class="stat-trend">
+        <span class="trend-badge trend-up">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg>
+          {{ stat.trend }}
+        </span>
+        <span class="trend-text">this quarter</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- FILTER BAR — <team-filter-bar>                                   -->
+  <!-- ================================================================ -->
+  <div class="filter-bar fade-in" style="animation-delay:0.25s">
+    <div class="filter-search">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+      <input type="text" v-model="searchQuery" placeholder="Search members..." />
+    </div>
+    <select class="filter-select" v-model="roleFilter">
+      <option value="all">All Roles</option>
+      <option v-for="r in roleOptions" :key="r" :value="r">{{ r }}</option>
+    </select>
+    <select class="filter-select" v-model="statusFilter">
+      <option value="all">All Status</option>
+      <option v-for="s in statusOptions" :key="s" :value="s">{{ s }}</option>
+    </select>
+    <span class="filter-count">Showing <strong>{{ filteredMembers.length }}</strong> of <strong>{{ members.length }}</strong> members</span>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- TEAM TABLE — <team-table>                                        -->
+  <!-- ================================================================ -->
+  <div class="card fade-in" style="animation-delay:0.3s">
+    <div class="card-header">
+      <div><div class="card-title">Team Members</div><div class="card-subtitle">IT Division staff directory</div></div>
+      <button class="btn-ghost">Export</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="team-table">
+        <thead><tr><th>Member</th><th>Role</th><th>Projects</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          <tr v-for="m in filteredMembers" :key="m.id">
+            <td>
+              <div class="member-cell">
+                <div :class="['member-avatar', m.avatarColor]">{{ m.initials }}</div>
+                <div><div class="member-name">{{ m.name }}</div><div class="member-username">@{{ m.username }}</div></div>
+              </div>
+            </td>
+            <td><span :class="['badge', roleBadge(m.role)]">{{ m.role }}</span></td>
+            <td>
+              <div class="projects-count">{{ m.projects.length }} projects</div>
+              <div class="project-tags">
+                <span v-for="(p, pi) in m.projects.slice(0, 2)" :key="pi" class="project-tag">{{ p }}</span>
+                <span v-if="m.projects.length > 2" class="project-tag">+{{ m.projects.length - 2 }}</span>
+              </div>
+            </td>
+            <td><span class="member-email">{{ m.email }}</span></td>
+            <td><span :class="['badge', statusBadge(m.status)]">{{ m.status }}</span></td>
+            <td>
+              <div class="actions-cell">
+                <button class="btn-view" @click="handleView(m)">View</button>
+                <button class="btn-view" @click="handleEdit(m)">Edit</button>
+                <button class="btn-dots"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/></svg></button>
+              </div>
+            </td>
+          </tr>
+          <tr v-if="filteredMembers.length === 0"><td colspan="6" class="empty-row">No members match your filters.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- PROJECT ASSIGNMENTS — <project-assignments>                      -->
+  <!-- ================================================================ -->
+  <div class="card fade-in" style="margin-top:24px;animation-delay:0.35s">
+    <div class="card-header">
+      <div><div class="card-title">Project Assignments</div><div class="card-subtitle">Team distribution across active projects</div></div>
+    </div>
+    <div v-for="pa in projectAssignments" :key="pa.name" class="assignment-item">
+      <div class="assignment-project">
+        <span class="assignment-dot" :style="{ background: pa.color }"></span>
+        <div><div class="assignment-name">{{ pa.name }}</div><div class="assignment-count">{{ pa.members.length }} members</div></div>
+      </div>
+      <div class="avatar-stack">
+        <div v-for="(am, ai) in pa.members.slice(0, 4)" :key="ai" :class="['avatar-stack-item', am.avatarColor]">{{ am.initials }}</div>
+        <div v-if="pa.members.length > 4" class="avatar-stack-overflow">+{{ pa.members.length - 4 }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:32px;"></div>
+</div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- VUE APPLICATION                                                      -->
+<!-- ==================================================================== -->
+<script>
+const { createApp, ref, computed } = Vue
+
+createApp({
+  setup() {
+    const searchQuery = ref('')
+    const roleFilter = ref('all')
+    const statusFilter = ref('all')
+
+    const roleOptions = ['Admin', 'Project Manager', 'Developer', 'QA']
+    const statusOptions = ['Active', 'On Leave', 'Inactive']
+
+    const members = ref([
+      { id: 1, name: 'Andi Rahmat', username: 'andirahmat', initials: 'AR', avatarColor: 'bg-brand', role: 'Admin', email: 'andi@company.co.id', status: 'Active', projects: ['ERP', 'SSO', 'Mobile App', 'API Gateway', 'Data Warehouse'] },
+      { id: 2, name: 'Budi Santoso', username: 'budisantoso', initials: 'BS', avatarColor: 'bg-violet', role: 'Project Manager', email: 'budi@company.co.id', status: 'Active', projects: ['ERP', 'Monitoring', 'Data Warehouse'] },
+      { id: 3, name: 'Dina Permata', username: 'dinapermata', initials: 'DP', avatarColor: 'bg-sky', role: 'Project Manager', email: 'dina@company.co.id', status: 'Active', projects: ['Mobile App', 'SSO'] },
+      { id: 4, name: 'Fajar Hidayat', username: 'fajarhidayat', initials: 'FH', avatarColor: 'bg-amber', role: 'Developer', email: 'fajar@company.co.id', status: 'Active', projects: ['API Gateway', 'Monitoring'] },
+      { id: 5, name: 'Rina Wulandari', username: 'rinawulandari', initials: 'RW', avatarColor: 'bg-emerald', role: 'Developer', email: 'rina@company.co.id', status: 'On Leave', projects: ['Data Warehouse', 'ERP'] },
+      { id: 6, name: 'Hadi Kurniawan', username: 'hadikurniawan', initials: 'HK', avatarColor: 'bg-teal', role: 'Developer', email: 'hadi@company.co.id', status: 'Active', projects: ['Monitoring', 'API Gateway'] },
+      { id: 7, name: 'Sari Nuraini', username: 'sarinuraini', initials: 'SN', avatarColor: 'bg-rose', role: 'QA', email: 'sari@company.co.id', status: 'Active', projects: ['Mobile App', 'ERP', 'SSO'] },
+      { id: 8, name: 'Teguh Wibowo', username: 'teguhwibowo', initials: 'TW', avatarColor: 'bg-indigo', role: 'QA', email: 'teguh@company.co.id', status: 'Active', projects: ['API Gateway', 'SSO'] },
+    ])
+
+    // Computed stats from members data
+    const summaryStats = computed(() => {
+      const all = members.value
+      return [
+        { label: 'Total Members', value: all.length, trend: '+2', iconBg: 'icon-bg-brand', icon: '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>' },
+        { label: 'Developers', value: all.filter(m => m.role === 'Developer').length, trend: '+1', iconBg: 'icon-bg-blue', icon: '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"/></svg>' },
+        { label: 'QA Engineers', value: all.filter(m => m.role === 'QA').length, trend: '+1', iconBg: 'icon-bg-amber', icon: '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"/></svg>' },
+        { label: 'Project Managers', value: all.filter(m => m.role === 'Project Manager' || m.role === 'Admin').length, trend: 'Stable', iconBg: 'icon-bg-violet', icon: '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5"/></svg>' },
+      ]
+    })
+
+    // Project assignments computed from members
+    const projectAssignments = computed(() => {
+      const projectMap = {}
+      const projectColors = { 'ERP': '#8b5cf6', 'Mobile App': '#0ea5e9', 'API Gateway': '#f59e0b', 'Data Warehouse': '#10b981', 'SSO': '#3b6ff8', 'Monitoring': '#14b8a6' }
+      members.value.forEach(m => {
+        m.projects.forEach(p => {
+          if (!projectMap[p]) projectMap[p] = { name: p, color: projectColors[p] || '#6b7280', members: [] }
+          projectMap[p].members.push({ initials: m.initials, avatarColor: m.avatarColor })
+        })
+      })
+      return Object.values(projectMap).sort((a, b) => b.members.length - a.members.length)
+    })
+
+    // Badge resolvers
+    const roleBadge = (role) => ({ 'Admin': 'badge-admin', 'Project Manager': 'badge-pm', 'Developer': 'badge-dev', 'QA': 'badge-qa' }[role] || 'badge-dev')
+    const statusBadge = (status) => ({ 'Active': 'badge-active', 'On Leave': 'badge-onleave', 'Inactive': 'badge-inactive' }[status] || 'badge-active')
+
+    // Filtered members
+    const filteredMembers = computed(() => {
+      let result = [...members.value]
+      if (roleFilter.value !== 'all') result = result.filter(m => m.role === roleFilter.value)
+      if (statusFilter.value !== 'all') result = result.filter(m => m.status === statusFilter.value)
+      if (searchQuery.value.trim()) {
+        const q = searchQuery.value.toLowerCase()
+        result = result.filter(m => m.name.toLowerCase().includes(q) || m.username.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.role.toLowerCase().includes(q))
+      }
+      return result
+    })
+
+    const handleAddMember = () => alert('Add Member dialog — integrate with your modal component')
+    const handleView = (m) => alert(`View profile: ${m.name}\nRole: ${m.role}`)
+    const handleEdit = (m) => alert(`Edit member: ${m.name}`)
+
+    return {
+      searchQuery, roleFilter, statusFilter, roleOptions, statusOptions,
+      members, summaryStats, filteredMembers, projectAssignments,
+      roleBadge, statusBadge, handleAddMember, handleView, handleEdit,
+    }
+  }
+}).mount('#app')
+</script>
+
+</body>
+</html>

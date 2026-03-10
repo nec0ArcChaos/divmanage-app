@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProjectHub — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand-50: #eef4ff; --brand-100: #d9e6ff; --brand-200: #bcd4ff;
+      --brand-400: #5994ff; --brand-500: #3b6ff8; --brand-600: #2150ed; --brand-700: #1a3dd9;
+      --s0: #ffffff; --s50: #f8f9fb; --s100: #f1f3f6; --s200: #e5e8ed;
+      --s300: #d1d6de; --s400: #9ca3b0; --s500: #6b7280; --s600: #4b5563;
+      --s700: #374151; --s800: #1f2937; --s900: #111827;
+    }
+
+    html, body { height: 100%; }
+    body {
+      font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+      background: var(--s50); color: var(--s800);
+      -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.5;
+    }
+
+    * { scrollbar-width: thin; scrollbar-color: var(--s300) transparent; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--s300); border-radius: 3px; }
+
+    /* ================================================================ */
+    /* LAYOUT                                                           */
+    /* ================================================================ */
+    .app-shell { display: flex; height: 100vh; overflow: hidden; }
+
+    /* ================================================================ */
+    /* SIDEBAR — <app-sidebar>                                          */
+    /* ================================================================ */
+    .sidebar {
+      width: 260px; min-width: 260px; background: var(--s0);
+      border-right: 1px solid var(--s200); display: flex; flex-direction: column;
+    }
+    .sidebar-logo {
+      height: 60px; display: flex; align-items: center; gap: 12px;
+      padding: 0 20px; border-bottom: 1px solid var(--s200);
+    }
+    .sidebar-logo-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--brand-600); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .sidebar-logo-text { font-size: 15px; font-weight: 700; color: var(--s900); letter-spacing: -0.3px; }
+    .sidebar-nav { flex: 1; overflow-y: auto; padding: 16px 12px; }
+    .sidebar-section-label {
+      font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.8px; color: var(--s400); padding: 0 12px; margin-bottom: 8px;
+    }
+    .sidebar-link {
+      display: flex; align-items: center; gap: 12px; padding: 9px 12px;
+      border-radius: 8px; font-size: 13.5px; font-weight: 500; color: var(--s500);
+      text-decoration: none; cursor: pointer; border: none; background: none;
+      width: 100%; transition: all 0.15s ease; position: relative;
+    }
+    .sidebar-link:hover { background: var(--s100); color: var(--s800); }
+    .sidebar-link:active { transform: scale(0.98); }
+    .sidebar-link.active { background: var(--brand-50); color: var(--brand-700); }
+    .sidebar-link-icon {
+      width: 32px; height: 32px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--s100); color: var(--s400); transition: all 0.15s ease;
+    }
+    .sidebar-link:hover .sidebar-link-icon { background: var(--s200); color: var(--s600); }
+    .sidebar-link.active .sidebar-link-icon { background: var(--brand-100); color: var(--brand-600); }
+    .sidebar-badge {
+      margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px;
+      border-radius: 10px; background: var(--brand-100); color: var(--brand-700);
+      font-size: 11px; font-weight: 700;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .sidebar-footer {
+      border-top: 1px solid var(--s200); padding: 16px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .sidebar-footer-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--brand-400), var(--brand-600));
+      color: #fff; font-size: 13px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .sidebar-footer-info { min-width: 0; flex: 1; }
+    .sidebar-footer-name { font-size: 13px; font-weight: 600; color: var(--s800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar-footer-role { font-size: 11.5px; color: var(--s400); }
+
+    /* ================================================================ */
+    /* MAIN WRAPPER                                                     */
+    /* ================================================================ */
+    .main-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+    /* ================================================================ */
+    /* TOP NAVBAR — <app-navbar>                                        */
+    /* ================================================================ */
+    .topbar {
+      height: 60px; flex-shrink: 0; background: var(--s0);
+      border-bottom: 1px solid var(--s200);
+      display: flex; align-items: center; gap: 16px; padding: 0 24px;
+    }
+    .search-box { position: relative; max-width: 420px; flex: 1; }
+    .search-box svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--s400); }
+    .search-box input {
+      width: 100%; height: 36px; border: 1px solid var(--s200); border-radius: 8px;
+      background: var(--s50); padding: 0 44px 0 36px;
+      font-size: 13px; font-family: inherit; color: var(--s700); outline: none; transition: all 0.15s ease;
+    }
+    .search-box input::placeholder { color: var(--s400); }
+    .search-box input:focus { border-color: var(--brand-200); background: #fff; box-shadow: 0 0 0 3px var(--brand-50); }
+    .search-box kbd {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      padding: 2px 6px; border-radius: 4px; border: 1px solid var(--s200); background: var(--s100);
+      font-size: 10px; font-family: 'DM Sans', monospace; color: var(--s400);
+    }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+    .icon-btn {
+      width: 36px; height: 36px; border-radius: 8px; border: none; background: none;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      color: var(--s500); transition: all 0.15s ease; position: relative;
+    }
+    .icon-btn:hover { background: var(--s100); color: var(--s700); }
+    .notif-dot {
+      position: absolute; top: 6px; right: 6px; width: 8px; height: 8px;
+      border-radius: 50%; background: #ef4444; border: 2px solid #fff;
+    }
+    .user-btn {
+      display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 8px;
+      border: none; background: none; cursor: pointer; transition: background 0.15s ease; margin-left: 8px;
+    }
+    .user-btn:hover { background: var(--s100); }
+    .user-btn-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--brand-400), var(--brand-600));
+      color: #fff; font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ================================================================ */
+    /* MAIN CONTENT                                                     */
+    /* ================================================================ */
+    .main-content { flex: 1; overflow-y: auto; }
+    .content-inner { max-width: 1200px; margin: 0 auto; padding: 28px 32px; }
+
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 32px; flex-wrap: wrap; gap: 16px; }
+    .page-header h1 { font-size: 24px; font-weight: 700; color: var(--s900); letter-spacing: -0.5px; line-height: 1.2; }
+    .page-header p { margin-top: 4px; font-size: 14px; color: var(--s500); }
+
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px;
+      border-radius: 8px; border: none; background: var(--brand-600); color: #fff;
+      font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+      transition: all 0.15s ease; box-shadow: 0 1px 3px rgba(33, 80, 237, 0.2);
+    }
+    .btn-primary:hover { background: var(--brand-700); box-shadow: 0 4px 12px rgba(33, 80, 237, 0.25); }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px;
+      border: 1px solid var(--s200); background: none;
+      font-size: 12.5px; font-weight: 500; font-family: inherit; color: var(--s600);
+      cursor: pointer; transition: background 0.15s ease;
+    }
+    .btn-ghost:hover { background: var(--s50); }
+
+    /* ============================================================== */
+    /* STATS CARDS — <dashboard-stats>                                */
+    /* ============================================================== */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+    .stat-card {
+      background: var(--s0); border: 1px solid var(--s200); border-radius: 12px;
+      padding: 20px; transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .stat-card:hover { box-shadow: 0 4px 24px -4px rgba(0,0,0,0.07); transform: translateY(-1px); }
+    .stat-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .stat-label { font-size: 12.5px; font-weight: 500; color: var(--s400); }
+    .stat-value { font-size: 28px; font-weight: 700; color: var(--s900); letter-spacing: -1px; margin-top: 6px; line-height: 1; }
+    .stat-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stat-trend { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+    .trend-badge { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 600; }
+    .trend-up { color: #059669; }
+    .trend-down { color: #ef4444; }
+    .trend-text { font-size: 12px; color: var(--s400); }
+
+    /* ============================================================== */
+    /* TWO-COLUMN GRID                                                */
+    /* ============================================================== */
+    .two-col { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 32px; }
+    .card { background: var(--s0); border: 1px solid var(--s200); border-radius: 12px; overflow: hidden; }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--s100);
+    }
+    .card-title { font-size: 15px; font-weight: 600; color: var(--s900); }
+    .card-subtitle { font-size: 12.5px; color: var(--s400); margin-top: 2px; }
+
+    /* ============================================================== */
+    /* PROJECTS TABLE — <project-table>                               */
+    /* ============================================================== */
+    .project-table { width: 100%; border-collapse: collapse; }
+    .project-table th {
+      padding: 10px 20px; text-align: left; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.6px; color: var(--s400); border-bottom: 1px solid var(--s100);
+    }
+    .project-table td { padding: 14px 20px; font-size: 13.5px; }
+    .project-table tbody tr { border-bottom: 1px solid var(--s50); transition: background 0.1s ease; }
+    .project-table tbody tr:hover { background: rgba(248, 249, 251, 0.6); }
+    .project-table tbody tr:last-child { border-bottom: none; }
+    .project-name { font-weight: 500; color: var(--s800); }
+    .manager-cell { display: flex; align-items: center; gap: 8px; }
+    .mini-avatar {
+      width: 24px; height: 24px; border-radius: 50%; font-size: 10px; font-weight: 700; color: #fff;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .manager-name { font-size: 13px; color: var(--s600); }
+
+    /* Badges */
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; }
+    .badge-ontrack { background: #ecfdf5; color: #047857; outline: 1px solid #a7f3d0; }
+    .badge-atrisk { background: #fffbeb; color: #b45309; outline: 1px solid #fde68a; }
+    .badge-delayed { background: #fef2f2; color: #b91c1c; outline: 1px solid #fecaca; }
+    .badge-completed { background: var(--s100); color: var(--s500); outline: 1px solid var(--s200); }
+    .badge-inprogress { background: #eff6ff; color: #1d4ed8; outline: 1px solid #bfdbfe; }
+    .badge-todo { background: var(--s100); color: var(--s600); outline: 1px solid var(--s200); }
+    .badge-inreview { background: #f5f3ff; color: #6d28d9; outline: 1px solid #ddd6fe; }
+    .badge-critical { background: #fef2f2; color: #b91c1c; outline: 1px solid #fecaca; }
+    .badge-high { background: #fff7ed; color: #c2410c; outline: 1px solid #fed7aa; }
+    .badge-medium { background: #fffbeb; color: #b45309; outline: 1px solid #fde68a; }
+    .badge-low { background: var(--s100); color: var(--s500); outline: 1px solid var(--s200); }
+
+    /* Progress Bar */
+    .progress-track { height: 6px; border-radius: 3px; background: var(--s100); flex: 1; }
+    .progress-fill { height: 100%; border-radius: 3px; background: var(--brand-500); transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+    .progress-cell { display: flex; align-items: center; gap: 10px; }
+    .progress-pct { font-size: 12px; font-weight: 500; color: var(--s500); min-width: 32px; text-align: right; }
+    .deadline-text { font-size: 13px; color: var(--s500); white-space: nowrap; }
+
+    /* ============================================================== */
+    /* TASK LIST — <task-list>                                         */
+    /* ============================================================== */
+    .task-item { padding: 14px 20px; border-bottom: 1px solid var(--s50); transition: background 0.1s ease; cursor: default; }
+    .task-item:last-child { border-bottom: none; }
+    .task-item:hover { background: rgba(248, 249, 251, 0.6); }
+    .task-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .task-title { font-size: 13.5px; font-weight: 500; color: var(--s800); }
+    .task-item:hover .task-title { color: var(--brand-700); }
+    .task-project { font-size: 12px; color: var(--s400); margin-top: 2px; }
+    .task-meta { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+    .task-deadline { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--s400); }
+
+    /* ============================================================== */
+    /* ACTIVITY FEED — <activity-feed>                                */
+    /* ============================================================== */
+    .activity-item {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 16px 20px; border-bottom: 1px solid var(--s50); transition: background 0.1s ease;
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-item:hover { background: rgba(248, 249, 251, 0.6); }
+    .activity-avatar {
+      width: 32px; height: 32px; border-radius: 50%; font-size: 11px; font-weight: 700; color: #fff;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .activity-text { font-size: 13px; color: var(--s600); line-height: 1.5; }
+    .activity-user { font-weight: 600; color: var(--s800); }
+    .activity-target { font-weight: 500; color: var(--brand-600); }
+    .activity-time { font-size: 11.5px; color: var(--s400); margin-top: 4px; }
+
+    /* Color utilities */
+    .bg-violet { background: #8b5cf6; } .bg-sky { background: #0ea5e9; }
+    .bg-amber { background: #f59e0b; } .bg-emerald { background: #10b981; }
+    .bg-brand { background: var(--brand-500); }
+    .icon-bg-brand { background: var(--brand-50); color: var(--brand-600); }
+    .icon-bg-amber { background: #fffbeb; color: #d97706; }
+    .icon-bg-red { background: #fef2f2; color: #ef4444; }
+    .icon-bg-emerald { background: #ecfdf5; color: #059669; }
+
+    /* Animations */
+    .fade-in { animation: fadeIn 0.4s ease forwards; opacity: 0; transform: translateY(8px); }
+    @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+    .d1 { animation-delay: 0.05s; } .d2 { animation-delay: 0.1s; }
+    .d3 { animation-delay: 0.15s; } .d4 { animation-delay: 0.2s; }
+    .d5 { animation-delay: 0.25s; } .d6 { animation-delay: 0.3s; }
+
+    /* Responsive */
+    @media (max-width: 1100px) { .two-col { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .sidebar { display: none; }
+      .content-inner { padding: 20px 16px; }
+      .topbar { padding: 0 16px; }
+    }
+    @media (max-width: 540px) {
+      .stats-grid { grid-template-columns: 1fr; }
+      .page-header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="app-shell">
+
+  <!-- ================================================================ -->
+  <!-- SIDEBAR — <app-sidebar>                                          -->
+  <!-- ================================================================ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg>
+      </div>
+      <span class="sidebar-logo-text">ProjectHub</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <p class="sidebar-section-label">Menu</p>
+
+      <button class="sidebar-link active">
+        <span class="sidebar-link-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg></span>
+        Dashboard
+      </button>
+      <button class="sidebar-link">
+        <span class="sidebar-link-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"/></svg></span>
+        Projects <span class="sidebar-badge">12</span>
+      </button>
+      <button class="sidebar-link">
+        <span class="sidebar-link-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></span>
+        My Tasks <span class="sidebar-badge">5</span>
+      </button>
+      <button class="sidebar-link">
+        <span class="sidebar-link-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg></span>
+        Team
+      </button>
+      <button class="sidebar-link">
+        <span class="sidebar-link-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg></span>
+        Reports
+      </button>
+      <button class="sidebar-link">
+        <span class="sidebar-link-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></span>
+        Settings
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-footer-avatar">AR</div>
+      <div class="sidebar-footer-info">
+        <div class="sidebar-footer-name">Andi Rahmat</div>
+        <div class="sidebar-footer-role">IT Division Lead</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================================================================ -->
+  <!-- MAIN WRAPPER                                                     -->
+  <!-- ================================================================ -->
+  <div class="main-wrapper">
+
+    <!-- ============================================================== -->
+    <!-- TOP NAVBAR — <app-navbar>                                      -->
+    <!-- ============================================================== -->
+    <header class="topbar">
+      <div class="search-box">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+        <input type="text" placeholder="Search projects, tasks..." />
+        <kbd>⌘K</kbd>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"/></svg>
+          <span class="notif-dot"></span>
+        </button>
+        <button class="user-btn">
+          <div class="user-btn-avatar">AR</div>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--s400)"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ============================================================== -->
+    <!-- MAIN CONTENT                                                   -->
+    <!-- ============================================================== -->
+    <main class="main-content">
+      <div class="content-inner">
+
+        <!-- PAGE HEADER -->
+        <div class="page-header fade-in">
+          <div>
+            <h1>Dashboard</h1>
+            <p>Overview of your team's projects and tasks</p>
+          </div>
+          <button class="btn-primary">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+            Create Project
+          </button>
+        </div>
+
+        <!-- ========================================================== -->
+        <!-- STATS CARDS — <dashboard-stats>                            -->
+        <!-- ========================================================== -->
+        <div class="stats-grid">
+          <div class="stat-card fade-in d1">
+            <div class="stat-card-top">
+              <div><div class="stat-label">Active Projects</div><div class="stat-value">12</div></div>
+              <div class="stat-icon icon-bg-brand"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"/></svg></div>
+            </div>
+            <div class="stat-trend"><span class="trend-badge trend-up"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg> +2</span><span class="trend-text">vs last week</span></div>
+          </div>
+          <div class="stat-card fade-in d2">
+            <div class="stat-card-top">
+              <div><div class="stat-label">Tasks In Progress</div><div class="stat-value">34</div></div>
+              <div class="stat-icon icon-bg-amber"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg></div>
+            </div>
+            <div class="stat-trend"><span class="trend-badge trend-up"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg> +8</span><span class="trend-text">vs last week</span></div>
+          </div>
+          <div class="stat-card fade-in d3">
+            <div class="stat-card-top">
+              <div><div class="stat-label">Overdue Tasks</div><div class="stat-value">7</div></div>
+              <div class="stat-icon icon-bg-red"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg></div>
+            </div>
+            <div class="stat-trend"><span class="trend-badge trend-down"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5l15 15m0 0V8.25m0 11.25H8.25"/></svg> +3</span><span class="trend-text">vs last week</span></div>
+          </div>
+          <div class="stat-card fade-in d4">
+            <div class="stat-card-top">
+              <div><div class="stat-label">Completed This Week</div><div class="stat-value">19</div></div>
+              <div class="stat-icon icon-bg-emerald"><svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+            </div>
+            <div class="stat-trend"><span class="trend-badge trend-up"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg> +5</span><span class="trend-text">vs last week</span></div>
+          </div>
+        </div>
+
+        <!-- ========================================================== -->
+        <!-- TWO-COLUMN: PROJECTS + TASKS                               -->
+        <!-- ========================================================== -->
+        <div class="two-col">
+
+          <!-- PROJECTS TABLE — <project-table> -->
+          <div class="card fade-in d5">
+            <div class="card-header">
+              <div><div class="card-title">Projects Overview</div><div class="card-subtitle">Recent active projects</div></div>
+              <button class="btn-ghost">View All</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="project-table">
+                <thead><tr><th>Project</th><th>Manager</th><th>Status</th><th style="min-width:150px;">Progress</th><th>Deadline</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><span class="project-name">ERP System Migration</span></td>
+                    <td><div class="manager-cell"><div class="mini-avatar bg-violet">BS</div><span class="manager-name">Budi Santoso</span></div></td>
+                    <td><span class="badge badge-ontrack">On Track</span></td>
+                    <td><div class="progress-cell"><div class="progress-track"><div class="progress-fill" style="width:72%"></div></div><span class="progress-pct">72%</span></div></td>
+                    <td><span class="deadline-text">Mar 28, 2026</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="project-name">Mobile App Redesign</span></td>
+                    <td><div class="manager-cell"><div class="mini-avatar bg-sky">DP</div><span class="manager-name">Dina Permata</span></div></td>
+                    <td><span class="badge badge-atrisk">At Risk</span></td>
+                    <td><div class="progress-cell"><div class="progress-track"><div class="progress-fill" style="width:45%"></div></div><span class="progress-pct">45%</span></div></td>
+                    <td><span class="deadline-text">Apr 10, 2026</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="project-name">API Gateway v2</span></td>
+                    <td><div class="manager-cell"><div class="mini-avatar bg-amber">FH</div><span class="manager-name">Fajar Hidayat</span></div></td>
+                    <td><span class="badge badge-ontrack">On Track</span></td>
+                    <td><div class="progress-cell"><div class="progress-track"><div class="progress-fill" style="width:88%"></div></div><span class="progress-pct">88%</span></div></td>
+                    <td><span class="deadline-text">Mar 15, 2026</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="project-name">Data Warehouse Setup</span></td>
+                    <td><div class="manager-cell"><div class="mini-avatar bg-emerald">RW</div><span class="manager-name">Rina Wulandari</span></div></td>
+                    <td><span class="badge badge-delayed">Delayed</span></td>
+                    <td><div class="progress-cell"><div class="progress-track"><div class="progress-fill" style="width:31%"></div></div><span class="progress-pct">31%</span></div></td>
+                    <td><span class="deadline-text">May 01, 2026</span></td>
+                  </tr>
+                  <tr>
+                    <td><span class="project-name">SSO Integration</span></td>
+                    <td><div class="manager-cell"><div class="mini-avatar bg-brand">AR</div><span class="manager-name">Andi Rahmat</span></div></td>
+                    <td><span class="badge badge-completed">Completed</span></td>
+                    <td><div class="progress-cell"><div class="progress-track"><div class="progress-fill" style="width:100%"></div></div><span class="progress-pct">100%</span></div></td>
+                    <td><span class="deadline-text">Mar 02, 2026</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- MY TASKS — <task-list> -->
+          <div class="card fade-in d6">
+            <div class="card-header">
+              <div><div class="card-title">My Tasks</div><div class="card-subtitle">5 tasks assigned</div></div>
+              <button class="btn-ghost">See All</button>
+            </div>
+
+            <div class="task-item">
+              <div class="task-top">
+                <div><div class="task-title">Review API documentation</div><div class="task-project">API Gateway v2</div></div>
+                <span class="badge badge-high" style="font-size:10.5px;">High</span>
+              </div>
+              <div class="task-meta">
+                <span class="badge badge-inprogress" style="font-size:10.5px;">In Progress</span>
+                <span class="task-deadline"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg> Mar 10</span>
+              </div>
+            </div>
+            <div class="task-item">
+              <div class="task-top">
+                <div><div class="task-title">Setup staging environment</div><div class="task-project">ERP System Migration</div></div>
+                <span class="badge badge-medium" style="font-size:10.5px;">Medium</span>
+              </div>
+              <div class="task-meta">
+                <span class="badge badge-todo" style="font-size:10.5px;">To Do</span>
+                <span class="task-deadline"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg> Mar 12</span>
+              </div>
+            </div>
+            <div class="task-item">
+              <div class="task-top">
+                <div><div class="task-title">Fix login timeout issue</div><div class="task-project">Mobile App Redesign</div></div>
+                <span class="badge badge-critical" style="font-size:10.5px;">Critical</span>
+              </div>
+              <div class="task-meta">
+                <span class="badge badge-inprogress" style="font-size:10.5px;">In Progress</span>
+                <span class="task-deadline"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg> Mar 09</span>
+              </div>
+            </div>
+            <div class="task-item">
+              <div class="task-top">
+                <div><div class="task-title">Write unit tests for auth module</div><div class="task-project">SSO Integration</div></div>
+                <span class="badge badge-low" style="font-size:10.5px;">Low</span>
+              </div>
+              <div class="task-meta">
+                <span class="badge badge-inreview" style="font-size:10.5px;">In Review</span>
+                <span class="task-deadline"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg> Mar 14</span>
+              </div>
+            </div>
+            <div class="task-item">
+              <div class="task-top">
+                <div><div class="task-title">Database schema migration script</div><div class="task-project">Data Warehouse Setup</div></div>
+                <span class="badge badge-high" style="font-size:10.5px;">High</span>
+              </div>
+              <div class="task-meta">
+                <span class="badge badge-todo" style="font-size:10.5px;">To Do</span>
+                <span class="task-deadline"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg> Mar 16</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========================================================== -->
+        <!-- ACTIVITY FEED — <activity-feed>                            -->
+        <!-- ========================================================== -->
+        <div class="card fade-in d6" style="margin-bottom:32px;">
+          <div class="card-header">
+            <div><div class="card-title">Recent Activity</div><div class="card-subtitle">Latest updates from your team</div></div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-avatar bg-violet">BS</div>
+            <div><div class="activity-text"><span class="activity-user">Budi Santoso</span> moved task <span class="activity-target">API Authentication → Code Review</span></div><div class="activity-time">12 minutes ago</div></div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-avatar bg-sky">DP</div>
+            <div><div class="activity-text"><span class="activity-user">Dina Permata</span> created task <span class="activity-target">Fix Login Timeout Bug</span></div><div class="activity-time">43 minutes ago</div></div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-avatar bg-amber">FH</div>
+            <div><div class="activity-text"><span class="activity-user">Fajar Hidayat</span> completed milestone <span class="activity-target">Beta Release v2.1</span></div><div class="activity-time">1 hour ago</div></div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-avatar bg-emerald">RW</div>
+            <div><div class="activity-text"><span class="activity-user">Rina Wulandari</span> commented on <span class="activity-target">Data Pipeline Architecture</span></div><div class="activity-time">2 hours ago</div></div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-avatar bg-brand">AR</div>
+            <div><div class="activity-text"><span class="activity-user">Andi Rahmat</span> assigned task to Budi — <span class="activity-target">Deploy Staging Server</span></div><div class="activity-time">3 hours ago</div></div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+</body>
+</html>

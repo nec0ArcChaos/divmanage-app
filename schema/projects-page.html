@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProjectHub — Projects</title>
+
+  <!-- Vue 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand-50: #eef4ff; --brand-100: #d9e6ff; --brand-200: #bcd4ff;
+      --brand-400: #5994ff; --brand-500: #3b6ff8; --brand-600: #2150ed; --brand-700: #1a3dd9;
+      --s0: #ffffff; --s50: #f8f9fb; --s100: #f1f3f6; --s200: #e5e8ed;
+      --s300: #d1d6de; --s400: #9ca3b0; --s500: #6b7280; --s600: #4b5563;
+      --s700: #374151; --s800: #1f2937; --s900: #111827;
+    }
+
+    [v-cloak] { display: none; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+      background: var(--s50); color: var(--s800);
+      -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.5;
+    }
+
+    /* ================================================================ */
+    /* SHARED COMPONENTS (same tokens as dashboard)                     */
+    /* ================================================================ */
+    .content-inner { max-width: 1200px; margin: 0 auto; padding: 28px 32px; }
+
+    .page-header {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      margin-bottom: 28px; flex-wrap: wrap; gap: 16px;
+    }
+    .page-header h1 { font-size: 24px; font-weight: 700; color: var(--s900); letter-spacing: -0.5px; line-height: 1.2; }
+    .page-header p { margin-top: 4px; font-size: 14px; color: var(--s500); }
+
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px;
+      border-radius: 8px; border: none; background: var(--brand-600); color: #fff;
+      font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+      transition: all 0.15s ease; box-shadow: 0 1px 3px rgba(33, 80, 237, 0.2);
+    }
+    .btn-primary:hover { background: var(--brand-700); box-shadow: 0 4px 12px rgba(33, 80, 237, 0.25); }
+    .btn-primary:active { transform: scale(0.98); }
+
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px;
+      border: 1px solid var(--s200); background: var(--s0);
+      font-size: 12.5px; font-weight: 500; font-family: inherit; color: var(--s600);
+      cursor: pointer; transition: all 0.15s ease;
+    }
+    .btn-ghost:hover { background: var(--s50); border-color: var(--s300); }
+
+    .btn-sm {
+      display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+      border-radius: 7px; border: 1px solid var(--s200); background: var(--s0);
+      font-size: 12.5px; font-weight: 500; font-family: inherit; color: var(--s600);
+      cursor: pointer; transition: all 0.15s ease;
+    }
+    .btn-sm:hover { background: var(--s50); border-color: var(--s300); }
+    .btn-sm.active { background: var(--brand-50); border-color: var(--brand-200); color: var(--brand-700); }
+
+    .btn-card {
+      display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px;
+      border-radius: 7px; border: none; background: var(--brand-600); color: #fff;
+      font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-card:hover { background: var(--brand-700); }
+    .btn-card:active { transform: scale(0.97); }
+
+    /* Badges */
+    .badge {
+      display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px;
+      font-size: 11.5px; font-weight: 600;
+    }
+    .badge-planning { background: #f5f3ff; color: #6d28d9; outline: 1px solid #ddd6fe; }
+    .badge-active { background: #ecfdf5; color: #047857; outline: 1px solid #a7f3d0; }
+    .badge-maintenance { background: #fffbeb; color: #b45309; outline: 1px solid #fde68a; }
+    .badge-completed { background: var(--s100); color: var(--s500); outline: 1px solid var(--s200); }
+
+    /* Color utilities */
+    .bg-violet { background: #8b5cf6; } .bg-sky { background: #0ea5e9; }
+    .bg-amber { background: #f59e0b; } .bg-emerald { background: #10b981; }
+    .bg-brand { background: var(--brand-500); } .bg-rose { background: #f43f5e; }
+    .bg-teal { background: #14b8a6; }
+
+    .icon-bg-brand { background: var(--brand-50); color: var(--brand-600); }
+    .icon-bg-emerald { background: #ecfdf5; color: #059669; }
+    .icon-bg-amber { background: #fffbeb; color: #d97706; }
+    .icon-bg-red { background: #fef2f2; color: #ef4444; }
+
+    /* ================================================================ */
+    /* STATS CARDS — <projects-stats>                                   */
+    /* ================================================================ */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--s0); border: 1px solid var(--s200); border-radius: 12px;
+      padding: 20px; transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .stat-card:hover { box-shadow: 0 4px 24px -4px rgba(0,0,0,0.07); transform: translateY(-1px); }
+    .stat-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .stat-label { font-size: 12.5px; font-weight: 500; color: var(--s400); }
+    .stat-value { font-size: 28px; font-weight: 700; color: var(--s900); letter-spacing: -1px; margin-top: 6px; line-height: 1; }
+    .stat-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stat-trend { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+    .trend-badge { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 600; }
+    .trend-up { color: #059669; }
+    .trend-down { color: #ef4444; }
+    .trend-text { font-size: 12px; color: var(--s400); }
+
+    /* ================================================================ */
+    /* FILTER BAR — <projects-filter-bar>                               */
+    /* ================================================================ */
+    .filter-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    .filter-search { position: relative; flex: 1; min-width: 200px; max-width: 320px; }
+    .filter-search svg {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--s400);
+    }
+    .filter-search input {
+      width: 100%; height: 36px; border: 1px solid var(--s200); border-radius: 8px;
+      background: var(--s0); padding: 0 14px 0 36px;
+      font-size: 13px; font-family: inherit; color: var(--s700); outline: none; transition: all 0.15s ease;
+    }
+    .filter-search input::placeholder { color: var(--s400); }
+    .filter-search input:focus { border-color: var(--brand-200); background: #fff; box-shadow: 0 0 0 3px var(--brand-50); }
+
+    .filter-select {
+      height: 36px; border: 1px solid var(--s200); border-radius: 8px;
+      background: var(--s0); padding: 0 32px 0 12px;
+      font-size: 13px; font-family: inherit; color: var(--s600);
+      outline: none; cursor: pointer; transition: all 0.15s ease;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3b0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+    }
+    .filter-select:hover { border-color: var(--s300); }
+    .filter-select:focus { border-color: var(--brand-200); box-shadow: 0 0 0 3px var(--brand-50); }
+
+    .filter-count { font-size: 12.5px; color: var(--s400); margin-left: auto; }
+    .filter-count strong { color: var(--s700); font-weight: 600; }
+
+    /* ================================================================ */
+    /* PROJECTS GRID — <projects-grid>                                  */
+    /* ================================================================ */
+    .projects-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 32px; }
+
+    /* ================================================================ */
+    /* PROJECT CARD — <project-card>                                    */
+    /* ================================================================ */
+    .project-card {
+      background: var(--s0); border: 1px solid var(--s200); border-radius: 12px;
+      overflow: hidden; display: flex; flex-direction: column;
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    .project-card:hover { box-shadow: 0 8px 32px -6px rgba(0,0,0,0.08); transform: translateY(-2px); }
+
+    .project-card-header {
+      padding: 20px 20px 0; display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 12px;
+    }
+    .project-card-title { font-size: 15px; font-weight: 600; color: var(--s900); line-height: 1.3; letter-spacing: -0.2px; }
+
+    .project-card-body { padding: 12px 20px 0; flex: 1; }
+    .project-card-desc {
+      font-size: 13px; color: var(--s500); line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .project-card-manager { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+    .manager-avatar {
+      width: 28px; height: 28px; border-radius: 50%; font-size: 10.5px; font-weight: 700;
+      color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .manager-info { min-width: 0; }
+    .manager-label { font-size: 11px; color: var(--s400); }
+    .manager-name { font-size: 13px; font-weight: 500; color: var(--s800); }
+
+    .project-card-footer { padding: 16px 20px 20px; margin-top: 16px; border-top: 1px solid var(--s100); }
+
+    .progress-section { margin-bottom: 14px; }
+    .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .progress-label { font-size: 12px; color: var(--s400); }
+    .progress-pct { font-size: 12px; font-weight: 600; color: var(--s700); }
+    .progress-track { height: 6px; border-radius: 3px; background: var(--s100); width: 100%; }
+    .progress-fill { height: 100%; border-radius: 3px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+    .fill-brand { background: var(--brand-500); }
+    .fill-emerald { background: #10b981; }
+    .fill-amber { background: #f59e0b; }
+    .fill-violet { background: #8b5cf6; }
+
+    .project-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .meta-items { display: flex; align-items: center; gap: 14px; }
+    .meta-item { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--s400); }
+    .meta-item svg { flex-shrink: 0; }
+
+    /* Empty state */
+    .empty-state {
+      grid-column: 1 / -1; text-align: center; padding: 60px 20px;
+      color: var(--s400);
+    }
+    .empty-state-icon {
+      width: 56px; height: 56px; border-radius: 14px; margin: 0 auto 16px;
+      background: var(--s100); display: flex; align-items: center; justify-content: center;
+      color: var(--s400);
+    }
+    .empty-state h3 { font-size: 16px; font-weight: 600; color: var(--s700); margin-bottom: 4px; }
+    .empty-state p { font-size: 13px; color: var(--s400); }
+
+    /* ================================================================ */
+    /* ANIMATIONS                                                       */
+    /* ================================================================ */
+    .fade-in { animation: fadeIn 0.4s ease forwards; opacity: 0; transform: translateY(8px); }
+    @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+
+    /* ================================================================ */
+    /* RESPONSIVE                                                       */
+    /* ================================================================ */
+    @media (max-width: 1100px) { .projects-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 900px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .content-inner { padding: 20px 16px; }
+    }
+    @media (max-width: 640px) {
+      .projects-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .page-header { flex-direction: column; align-items: flex-start; }
+      .filter-bar { flex-direction: column; align-items: stretch; }
+      .filter-search { max-width: none; }
+      .filter-count { margin-left: 0; }
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="app" v-cloak>
+<div class="content-inner">
+
+  <!-- ================================================================ -->
+  <!-- PAGE HEADER                                                      -->
+  <!-- ================================================================ -->
+  <div class="page-header fade-in" style="animation-delay:0.05s">
+    <div>
+      <h1>Projects</h1>
+      <p>Manage and monitor all ongoing projects</p>
+    </div>
+    <button class="btn-primary" @click="handleCreateProject">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+      Create Project
+    </button>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- QUICK STATS — <projects-stats>                                   -->
+  <!-- ================================================================ -->
+  <div class="stats-grid">
+    <div
+      v-for="(stat, i) in stats"
+      :key="stat.label"
+      class="stat-card fade-in"
+      :style="{ animationDelay: (0.05 + i * 0.05) + 's' }"
+    >
+      <div class="stat-card-top">
+        <div>
+          <div class="stat-label">{{ stat.label }}</div>
+          <div class="stat-value">{{ stat.value }}</div>
+        </div>
+        <div :class="['stat-icon', stat.iconBg]" v-html="stat.icon"></div>
+      </div>
+      <div class="stat-trend">
+        <span :class="['trend-badge', stat.trendUp ? 'trend-up' : 'trend-down']">
+          <svg v-if="stat.trendUp" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg>
+          <svg v-else width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5l15 15m0 0V8.25m0 11.25H8.25"/></svg>
+          {{ stat.trend }}
+        </span>
+        <span class="trend-text">{{ stat.trendLabel }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- FILTER BAR — <projects-filter-bar>                               -->
+  <!-- ================================================================ -->
+  <div class="filter-bar fade-in" style="animation-delay:0.25s">
+    <div class="filter-search">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+      <input type="text" v-model="searchQuery" placeholder="Search projects..." />
+    </div>
+
+    <select class="filter-select" v-model="statusFilter">
+      <option value="all">All Status</option>
+      <option value="Planning">Planning</option>
+      <option value="Active">Active</option>
+      <option value="Maintenance">Maintenance</option>
+      <option value="Completed">Completed</option>
+    </select>
+
+    <select class="filter-select" v-model="sortBy">
+      <option value="updated">Recently Updated</option>
+      <option value="deadline">Deadline</option>
+      <option value="name">Project Name</option>
+      <option value="progress">Progress</option>
+    </select>
+
+    <button
+      :class="['btn-sm', { active: viewMode === 'grid' }]"
+      @click="viewMode = 'grid'"
+    >
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg>
+      Grid
+    </button>
+
+    <button
+      :class="['btn-sm', { active: viewMode === 'list' }]"
+      @click="viewMode = 'list'"
+    >
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
+      List
+    </button>
+
+    <span class="filter-count">
+      Showing <strong>{{ filteredProjects.length }}</strong> of <strong>{{ projects.length }}</strong> projects
+    </span>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- PROJECTS GRID — <projects-grid>                                  -->
+  <!-- ================================================================ -->
+  <div class="projects-grid" style="margin-bottom:32px;">
+
+    <!-- PROJECT CARD — <project-card> -->
+    <div
+      v-for="(project, i) in filteredProjects"
+      :key="project.id"
+      class="project-card fade-in"
+      :style="{ animationDelay: (0.3 + i * 0.06) + 's' }"
+    >
+      <div class="project-card-header">
+        <span class="project-card-title">{{ project.name }}</span>
+        <span :class="['badge', badgeClass(project.status)]">{{ project.status }}</span>
+      </div>
+
+      <div class="project-card-body">
+        <p class="project-card-desc">{{ project.description }}</p>
+        <div class="project-card-manager">
+          <div :class="['manager-avatar', project.avatarColor]">{{ project.managerInitials }}</div>
+          <div class="manager-info">
+            <div class="manager-label">Project Manager</div>
+            <div class="manager-name">{{ project.manager }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="project-card-footer">
+        <div class="progress-section">
+          <div class="progress-header">
+            <span class="progress-label">Progress</span>
+            <span class="progress-pct">{{ project.progress }}%</span>
+          </div>
+          <div class="progress-track">
+            <div :class="['progress-fill', project.progressColor]" :style="{ width: project.progress + '%' }"></div>
+          </div>
+        </div>
+        <div class="project-card-meta">
+          <div class="meta-items">
+            <span class="meta-item">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              {{ project.tasks }} tasks
+            </span>
+            <span class="meta-item">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+              {{ project.deadline }}
+            </span>
+          </div>
+          <button class="btn-card" @click="handleOpenProject(project)">Open</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div v-if="filteredProjects.length === 0" class="empty-state">
+      <div class="empty-state-icon">
+        <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+      </div>
+      <h3>No projects found</h3>
+      <p>Try adjusting your search or filter criteria.</p>
+    </div>
+
+  </div>
+
+</div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- VUE APPLICATION                                                      -->
+<!-- ==================================================================== -->
+<script>
+const { createApp, ref, computed } = Vue
+
+createApp({
+  setup() {
+    // Filter & view state
+    const searchQuery = ref('')
+    const statusFilter = ref('all')
+    const sortBy = ref('updated')
+    const viewMode = ref('grid')
+
+    // Stats data — computed from projects in real app
+    const stats = [
+      {
+        label: 'Total Projects', value: 24, trend: '+3', trendUp: true, trendLabel: 'this month',
+        iconBg: 'icon-bg-brand',
+        icon: '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"/></svg>',
+      },
+      {
+        label: 'Active Projects', value: 12, trend: '+2', trendUp: true, trendLabel: 'this month',
+        iconBg: 'icon-bg-emerald',
+        icon: '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg>',
+      },
+      {
+        label: 'Near Deadline', value: 4, trend: '+1', trendUp: false, trendLabel: 'vs last week',
+        iconBg: 'icon-bg-amber',
+        icon: '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+      },
+      {
+        label: 'Completed', value: 8, trend: '+2', trendUp: true, trendLabel: 'this month',
+        iconBg: 'icon-bg-emerald',
+        icon: '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+      },
+    ]
+
+    // Projects data — will come from API in real app
+    const projects = ref([
+      {
+        id: 1, name: 'ERP System Migration', status: 'Active',
+        description: 'Full migration of legacy ERP modules to cloud-based microservices architecture with zero downtime requirement.',
+        manager: 'Budi Santoso', managerInitials: 'BS', avatarColor: 'bg-violet',
+        progress: 72, progressColor: 'fill-brand', tasks: 36, deadline: 'Mar 28',
+        deadlineRaw: '2026-03-28', updatedAt: '2026-03-07',
+      },
+      {
+        id: 2, name: 'Mobile App Redesign', status: 'Active',
+        description: 'Complete UI/UX overhaul of the company mobile app with new design system and improved user flows.',
+        manager: 'Dina Permata', managerInitials: 'DP', avatarColor: 'bg-sky',
+        progress: 45, progressColor: 'fill-brand', tasks: 28, deadline: 'Apr 10',
+        deadlineRaw: '2026-04-10', updatedAt: '2026-03-06',
+      },
+      {
+        id: 3, name: 'API Gateway v2', status: 'Active',
+        description: 'Build centralized API gateway with rate limiting, auth middleware, and request routing for all services.',
+        manager: 'Fajar Hidayat', managerInitials: 'FH', avatarColor: 'bg-amber',
+        progress: 88, progressColor: 'fill-emerald', tasks: 22, deadline: 'Mar 15',
+        deadlineRaw: '2026-03-15', updatedAt: '2026-03-08',
+      },
+      {
+        id: 4, name: 'Data Warehouse Setup', status: 'Planning',
+        description: 'Design and implement centralized data warehouse with ETL pipelines for cross-department reporting.',
+        manager: 'Rina Wulandari', managerInitials: 'RW', avatarColor: 'bg-emerald',
+        progress: 31, progressColor: 'fill-violet', tasks: 18, deadline: 'May 01',
+        deadlineRaw: '2026-05-01', updatedAt: '2026-03-04',
+      },
+      {
+        id: 5, name: 'SSO Integration', status: 'Completed',
+        description: 'Implement Single Sign-On across all internal applications using OAuth2 and SAML protocols.',
+        manager: 'Andi Rahmat', managerInitials: 'AR', avatarColor: 'bg-brand',
+        progress: 100, progressColor: 'fill-emerald', tasks: 14, deadline: 'Mar 02',
+        deadlineRaw: '2026-03-02', updatedAt: '2026-03-02',
+      },
+      {
+        id: 6, name: 'Internal Monitoring Stack', status: 'Maintenance',
+        description: 'Setup and maintain Grafana, Prometheus, and alerting infrastructure for all production services.',
+        manager: 'Hadi Kurniawan', managerInitials: 'HK', avatarColor: 'bg-teal',
+        progress: 65, progressColor: 'fill-amber', tasks: 20, deadline: 'Apr 20',
+        deadlineRaw: '2026-04-20', updatedAt: '2026-03-05',
+      },
+    ])
+
+    // Badge class resolver
+    const badgeClass = (status) => {
+      const map = {
+        'Planning': 'badge-planning',
+        'Active': 'badge-active',
+        'Maintenance': 'badge-maintenance',
+        'Completed': 'badge-completed',
+      }
+      return map[status] || 'badge-active'
+    }
+
+    // Filtered + sorted projects
+    const filteredProjects = computed(() => {
+      let result = [...projects.value]
+
+      // Status filter
+      if (statusFilter.value !== 'all') {
+        result = result.filter(p => p.status === statusFilter.value)
+      }
+
+      // Search filter
+      if (searchQuery.value.trim()) {
+        const q = searchQuery.value.toLowerCase()
+        result = result.filter(p =>
+          p.name.toLowerCase().includes(q) ||
+          p.description.toLowerCase().includes(q) ||
+          p.manager.toLowerCase().includes(q)
+        )
+      }
+
+      // Sort
+      switch (sortBy.value) {
+        case 'updated':
+          result.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+          break
+        case 'deadline':
+          result.sort((a, b) => a.deadlineRaw.localeCompare(b.deadlineRaw))
+          break
+        case 'name':
+          result.sort((a, b) => a.name.localeCompare(b.name))
+          break
+        case 'progress':
+          result.sort((a, b) => b.progress - a.progress)
+          break
+      }
+
+      return result
+    })
+
+    // Handlers — replace with router/emit in real app
+    const handleCreateProject = () => {
+      alert('Create Project dialog — integrate with your modal component')
+    }
+
+    const handleOpenProject = (project) => {
+      alert(`Opening project: ${project.name}\nNavigate to /projects/${project.id}`)
+    }
+
+    return {
+      searchQuery,
+      statusFilter,
+      sortBy,
+      viewMode,
+      stats,
+      projects,
+      filteredProjects,
+      badgeClass,
+      handleCreateProject,
+      handleOpenProject,
+    }
+  }
+}).mount('#app')
+</script>
+
+</body>
+</html>

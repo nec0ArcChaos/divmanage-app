@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProjectHub — My Tasks</title>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand-50: #eef4ff; --brand-100: #d9e6ff; --brand-200: #bcd4ff;
+      --brand-400: #5994ff; --brand-500: #3b6ff8; --brand-600: #2150ed; --brand-700: #1a3dd9;
+      --s0: #ffffff; --s50: #f8f9fb; --s100: #f1f3f6; --s200: #e5e8ed;
+      --s300: #d1d6de; --s400: #9ca3b0; --s500: #6b7280; --s600: #4b5563;
+      --s700: #374151; --s800: #1f2937; --s900: #111827;
+    }
+
+    [v-cloak] { display: none; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+      background: var(--s50); color: var(--s800);
+      -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.5;
+    }
+
+    /* ================================================================ */
+    /* SHARED COMPONENTS                                                */
+    /* ================================================================ */
+    .content-inner { max-width: 1200px; margin: 0 auto; padding: 28px 32px; }
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 16px; }
+    .page-header h1 { font-size: 24px; font-weight: 700; color: var(--s900); letter-spacing: -0.5px; line-height: 1.2; }
+    .page-header p { margin-top: 4px; font-size: 14px; color: var(--s500); }
+
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px;
+      border-radius: 8px; border: none; background: var(--brand-600); color: #fff;
+      font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+      transition: all 0.15s ease; box-shadow: 0 1px 3px rgba(33, 80, 237, 0.2);
+    }
+    .btn-primary:hover { background: var(--brand-700); box-shadow: 0 4px 12px rgba(33, 80, 237, 0.25); }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px;
+      border: 1px solid var(--s200); background: var(--s0);
+      font-size: 12.5px; font-weight: 500; font-family: inherit; color: var(--s600);
+      cursor: pointer; transition: all 0.15s ease;
+    }
+    .btn-ghost:hover { background: var(--s50); border-color: var(--s300); }
+    .btn-view {
+      display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px;
+      border-radius: 6px; border: 1px solid var(--s200); background: var(--s0);
+      font-size: 12px; font-weight: 500; font-family: inherit; color: var(--s600);
+      cursor: pointer; transition: all 0.12s ease;
+    }
+    .btn-view:hover { background: var(--brand-50); border-color: var(--brand-200); color: var(--brand-700); }
+    .btn-dots {
+      width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--s200);
+      background: var(--s0); cursor: pointer; display: flex; align-items: center;
+      justify-content: center; color: var(--s400); transition: all 0.12s ease;
+    }
+    .btn-dots:hover { background: var(--s100); color: var(--s600); }
+
+    /* Badges */
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; }
+    .badge-backlog { background: var(--s100); color: var(--s500); outline: 1px solid var(--s200); }
+    .badge-todo { background: var(--s100); color: var(--s600); outline: 1px solid var(--s200); }
+    .badge-inprogress { background: #eff6ff; color: #1d4ed8; outline: 1px solid #bfdbfe; }
+    .badge-codereview { background: #f5f3ff; color: #6d28d9; outline: 1px solid #ddd6fe; }
+    .badge-testing { background: #fdf4ff; color: #a21caf; outline: 1px solid #f0abfc; }
+    .badge-done { background: #ecfdf5; color: #047857; outline: 1px solid #a7f3d0; }
+    .badge-low { background: var(--s100); color: var(--s500); outline: 1px solid var(--s200); }
+    .badge-medium { background: #eff6ff; color: #1d4ed8; outline: 1px solid #bfdbfe; }
+    .badge-high { background: #fff7ed; color: #c2410c; outline: 1px solid #fed7aa; }
+    .badge-critical { background: #fef2f2; color: #b91c1c; outline: 1px solid #fecaca; }
+
+    .icon-bg-brand { background: var(--brand-50); color: var(--brand-600); }
+    .icon-bg-emerald { background: #ecfdf5; color: #059669; }
+    .icon-bg-blue { background: #eff6ff; color: #2563eb; }
+    .icon-bg-red { background: #fef2f2; color: #ef4444; }
+    .project-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ================================================================ */
+    /* STATS                                                            */
+    /* ================================================================ */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+    .stat-card { background: var(--s0); border: 1px solid var(--s200); border-radius: 12px; padding: 20px; transition: box-shadow 0.2s ease, transform 0.2s ease; }
+    .stat-card:hover { box-shadow: 0 4px 24px -4px rgba(0,0,0,0.07); transform: translateY(-1px); }
+    .stat-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .stat-label { font-size: 12.5px; font-weight: 500; color: var(--s400); }
+    .stat-value { font-size: 28px; font-weight: 700; color: var(--s900); letter-spacing: -1px; margin-top: 6px; line-height: 1; }
+    .stat-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stat-trend { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+    .trend-badge { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 600; }
+    .trend-up { color: #059669; } .trend-down { color: #ef4444; }
+    .trend-text { font-size: 12px; color: var(--s400); }
+
+    /* ================================================================ */
+    /* FILTER BAR                                                       */
+    /* ================================================================ */
+    .filter-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    .filter-search { position: relative; flex: 1; min-width: 200px; max-width: 320px; }
+    .filter-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--s400); }
+    .filter-search input {
+      width: 100%; height: 36px; border: 1px solid var(--s200); border-radius: 8px;
+      background: var(--s0); padding: 0 14px 0 36px;
+      font-size: 13px; font-family: inherit; color: var(--s700); outline: none; transition: all 0.15s ease;
+    }
+    .filter-search input::placeholder { color: var(--s400); }
+    .filter-search input:focus { border-color: var(--brand-200); background: #fff; box-shadow: 0 0 0 3px var(--brand-50); }
+    .filter-select {
+      height: 36px; border: 1px solid var(--s200); border-radius: 8px;
+      background: var(--s0); padding: 0 32px 0 12px;
+      font-size: 13px; font-family: inherit; color: var(--s600);
+      outline: none; cursor: pointer; transition: all 0.15s ease;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3b0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+    }
+    .filter-select:hover { border-color: var(--s300); }
+    .filter-select:focus { border-color: var(--brand-200); box-shadow: 0 0 0 3px var(--brand-50); }
+    .filter-count { font-size: 12.5px; color: var(--s400); margin-left: auto; }
+    .filter-count strong { color: var(--s700); font-weight: 600; }
+
+    /* ================================================================ */
+    /* TABLE                                                            */
+    /* ================================================================ */
+    .card { background: var(--s0); border: 1px solid var(--s200); border-radius: 12px; overflow: hidden; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--s100); }
+    .card-title { font-size: 15px; font-weight: 600; color: var(--s900); }
+    .card-subtitle { font-size: 12.5px; color: var(--s400); margin-top: 2px; }
+
+    .task-table { width: 100%; border-collapse: collapse; }
+    .task-table th {
+      padding: 10px 20px; text-align: left; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.6px; color: var(--s400);
+      border-bottom: 1px solid var(--s100); white-space: nowrap;
+    }
+    .task-table td { padding: 14px 20px; font-size: 13.5px; vertical-align: middle; }
+    .task-table tbody tr { border-bottom: 1px solid var(--s50); transition: background 0.1s ease; }
+    .task-table tbody tr:hover { background: rgba(248, 249, 251, 0.6); }
+    .task-table tbody tr:last-child { border-bottom: none; }
+    .task-name { font-weight: 500; color: var(--s800); }
+    .task-desc { font-size: 12px; color: var(--s400); margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+    .project-cell { display: flex; align-items: center; gap: 8px; }
+    .project-cell-name { font-size: 13px; color: var(--s600); }
+    .deadline-text { font-size: 13px; color: var(--s500); white-space: nowrap; }
+    .deadline-overdue { color: #b91c1c; font-weight: 600; }
+    .actions-cell { display: flex; align-items: center; gap: 6px; }
+
+    /* Empty */
+    .empty-row td { text-align: center; padding: 48px 20px; color: var(--s400); font-size: 13px; }
+
+    /* ================================================================ */
+    /* OVERDUE                                                          */
+    /* ================================================================ */
+    .overdue-card { background: var(--s0); border: 1px solid #fecaca; border-radius: 12px; overflow: hidden; margin-top: 24px; }
+    .overdue-header { display: flex; align-items: center; gap: 10px; padding: 14px 20px; background: #fef2f2; border-bottom: 1px solid #fecaca; }
+    .overdue-header-icon { width: 32px; height: 32px; border-radius: 8px; background: #fee2e2; display: flex; align-items: center; justify-content: center; color: #dc2626; }
+    .overdue-header-text { font-size: 14px; font-weight: 600; color: #991b1b; }
+    .overdue-header-count { font-size: 12px; color: #b91c1c; margin-left: 4px; font-weight: 500; }
+    .overdue-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--s50); transition: background 0.1s ease; }
+    .overdue-item:last-child { border-bottom: none; }
+    .overdue-item:hover { background: #fffbfb; }
+    .overdue-info { min-width: 0; flex: 1; }
+    .overdue-task-name { font-size: 13.5px; font-weight: 500; color: var(--s800); }
+    .overdue-task-project { font-size: 12px; color: var(--s400); margin-top: 2px; }
+    .overdue-deadline {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 12.5px; font-weight: 600; color: #b91c1c;
+      background: #fef2f2; padding: 4px 10px; border-radius: 6px; white-space: nowrap;
+    }
+
+    /* ================================================================ */
+    /* ANIMATIONS & RESPONSIVE                                          */
+    /* ================================================================ */
+    .fade-in { animation: fadeIn 0.4s ease forwards; opacity: 0; transform: translateY(8px); }
+    @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 900px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .content-inner { padding: 20px 16px; }
+      .task-table th, .task-table td { padding: 10px 12px; }
+    }
+    @media (max-width: 640px) {
+      .stats-grid { grid-template-columns: 1fr; }
+      .page-header { flex-direction: column; align-items: flex-start; }
+      .filter-bar { flex-direction: column; align-items: stretch; }
+      .filter-search { max-width: none; }
+      .filter-count { margin-left: 0; }
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="app" v-cloak>
+<div class="content-inner">
+
+  <!-- ================================================================ -->
+  <!-- PAGE HEADER                                                      -->
+  <!-- ================================================================ -->
+  <div class="page-header fade-in" style="animation-delay:0.05s">
+    <div>
+      <h1>My Tasks</h1>
+      <p>All tasks assigned to you across projects</p>
+    </div>
+    <button class="btn-primary" @click="handleCreateTask">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+      Create Task
+    </button>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- TASK SUMMARY — <task-summary>                                    -->
+  <!-- ================================================================ -->
+  <div class="stats-grid">
+    <div v-for="(stat, i) in summaryStats" :key="stat.label" class="stat-card fade-in" :style="{ animationDelay: (0.05 + i * 0.05) + 's' }">
+      <div class="stat-card-top">
+        <div><div class="stat-label">{{ stat.label }}</div><div class="stat-value">{{ stat.value }}</div></div>
+        <div :class="['stat-icon', stat.iconBg]" v-html="stat.icon"></div>
+      </div>
+      <div class="stat-trend">
+        <span :class="['trend-badge', stat.trendUp ? 'trend-up' : 'trend-down']">
+          <svg v-if="stat.trendUp" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg>
+          <svg v-else width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5l15 15m0 0V8.25m0 11.25H8.25"/></svg>
+          {{ stat.trend }}
+        </span>
+        <span class="trend-text">{{ stat.trendLabel }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- FILTER BAR — <task-filter-bar>                                   -->
+  <!-- ================================================================ -->
+  <div class="filter-bar fade-in" style="animation-delay:0.25s">
+    <div class="filter-search">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+      <input type="text" v-model="searchQuery" placeholder="Search tasks..." />
+    </div>
+    <select class="filter-select" v-model="statusFilter">
+      <option value="all">All Status</option>
+      <option v-for="s in statusOptions" :key="s" :value="s">{{ s }}</option>
+    </select>
+    <select class="filter-select" v-model="priorityFilter">
+      <option value="all">All Priority</option>
+      <option v-for="p in priorityOptions" :key="p" :value="p">{{ p }}</option>
+    </select>
+    <select class="filter-select" v-model="projectFilter">
+      <option value="all">All Projects</option>
+      <option v-for="pj in uniqueProjects" :key="pj" :value="pj">{{ pj }}</option>
+    </select>
+    <select class="filter-select" v-model="sortBy">
+      <option value="deadline">Deadline</option>
+      <option value="priority">Priority</option>
+      <option value="updated">Recently Updated</option>
+    </select>
+    <span class="filter-count">Showing <strong>{{ filteredTasks.length }}</strong> of <strong>{{ tasks.length }}</strong> tasks</span>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- TASK TABLE — <task-table>                                        -->
+  <!-- ================================================================ -->
+  <div class="card fade-in" style="animation-delay:0.3s">
+    <div class="card-header">
+      <div><div class="card-title">All Tasks</div><div class="card-subtitle">Tasks assigned to you across all projects</div></div>
+      <button class="btn-ghost">Export</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="task-table">
+        <thead><tr><th>Task</th><th>Project</th><th>Priority</th><th>Status</th><th>Deadline</th><th>Actions</th></tr></thead>
+        <tbody>
+          <tr v-for="task in filteredTasks" :key="task.id">
+            <td><div class="task-name">{{ task.title }}</div><div class="task-desc">{{ task.description }}</div></td>
+            <td><div class="project-cell"><span class="project-dot" :style="{ background: task.projectColor }"></span><span class="project-cell-name">{{ task.project }}</span></div></td>
+            <td><span :class="['badge', priorityBadge(task.priority)]">{{ task.priority }}</span></td>
+            <td><span :class="['badge', statusBadge(task.status)]">{{ task.status }}</span></td>
+            <td><span :class="['deadline-text', { 'deadline-overdue': isOverdue(task.deadlineRaw) }]">{{ task.deadline }}</span></td>
+            <td>
+              <div class="actions-cell">
+                <button class="btn-view" @click="handleViewTask(task)">View</button>
+                <button class="btn-dots"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/></svg></button>
+              </div>
+            </td>
+          </tr>
+          <tr v-if="filteredTasks.length === 0"><td colspan="6" class="empty-row" style="text-align:center;padding:48px 20px;color:var(--s400);font-size:13px;">No tasks match your filters. Try adjusting your criteria.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- OVERDUE TASKS — <overdue-task-list>                              -->
+  <!-- ================================================================ -->
+  <div v-if="overdueTasks.length > 0" class="overdue-card fade-in" style="animation-delay:0.35s">
+    <div class="overdue-header">
+      <div class="overdue-header-icon"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg></div>
+      <span class="overdue-header-text">Overdue Tasks</span>
+      <span class="overdue-header-count">— {{ overdueTasks.length }} tasks need attention</span>
+    </div>
+    <div v-for="task in overdueTasks" :key="'overdue-' + task.id" class="overdue-item">
+      <div class="overdue-info"><div class="overdue-task-name">{{ task.title }}</div><div class="overdue-task-project">{{ task.project }}</div></div>
+      <div class="overdue-deadline"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Due {{ task.deadline }}</div>
+    </div>
+  </div>
+
+  <div style="height:32px;"></div>
+</div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- VUE APPLICATION                                                      -->
+<!-- ==================================================================== -->
+<script>
+const { createApp, ref, computed } = Vue
+
+createApp({
+  setup() {
+    const TODAY = '2026-03-08'
+
+    // Filter state
+    const searchQuery = ref('')
+    const statusFilter = ref('all')
+    const priorityFilter = ref('all')
+    const projectFilter = ref('all')
+    const sortBy = ref('deadline')
+
+    const statusOptions = ['Backlog', 'To Do', 'In Progress', 'Code Review', 'Testing', 'Done']
+    const priorityOptions = ['Low', 'Medium', 'High', 'Critical']
+    const priorityWeight = { Critical: 4, High: 3, Medium: 2, Low: 1 }
+
+    // Tasks data
+    const tasks = ref([
+      { id: 1, title: 'Fix login timeout issue', description: 'Session expires after 5 minutes causing forced re-login', project: 'Mobile App Redesign', projectColor: '#0ea5e9', priority: 'Critical', status: 'In Progress', deadline: 'Mar 06', deadlineRaw: '2026-03-06', updatedAt: '2026-03-07' },
+      { id: 2, title: 'Review API documentation', description: 'Verify endpoint specs and update Swagger docs', project: 'API Gateway v2', projectColor: '#f59e0b', priority: 'High', status: 'Code Review', deadline: 'Mar 10', deadlineRaw: '2026-03-10', updatedAt: '2026-03-08' },
+      { id: 3, title: 'Setup staging environment', description: 'Configure Docker containers and CI/CD pipeline', project: 'ERP System Migration', projectColor: '#8b5cf6', priority: 'Medium', status: 'To Do', deadline: 'Mar 12', deadlineRaw: '2026-03-12', updatedAt: '2026-03-06' },
+      { id: 4, title: 'Write unit tests for auth module', description: 'Cover JWT validation, refresh token, and SSO flow', project: 'SSO Integration', projectColor: '#3b6ff8', priority: 'Low', status: 'Testing', deadline: 'Mar 14', deadlineRaw: '2026-03-14', updatedAt: '2026-03-05' },
+      { id: 5, title: 'Database schema migration script', description: 'Create migration for new warehouse tables and indexes', project: 'Data Warehouse Setup', projectColor: '#10b981', priority: 'High', status: 'Backlog', deadline: 'Mar 16', deadlineRaw: '2026-03-16', updatedAt: '2026-03-04' },
+      { id: 6, title: 'Implement rate limiter middleware', description: 'Token bucket algorithm with Redis backend', project: 'API Gateway v2', projectColor: '#f59e0b', priority: 'High', status: 'In Progress', deadline: 'Mar 13', deadlineRaw: '2026-03-13', updatedAt: '2026-03-08' },
+      { id: 7, title: 'Design notification system schema', description: 'Define DB tables for in-app and email notifications', project: 'ERP System Migration', projectColor: '#8b5cf6', priority: 'Medium', status: 'To Do', deadline: 'Mar 20', deadlineRaw: '2026-03-20', updatedAt: '2026-03-03' },
+      { id: 8, title: 'Update deployment scripts', description: 'Fix broken CI config for production pipeline', project: 'API Gateway v2', projectColor: '#f59e0b', priority: 'High', status: 'In Progress', deadline: 'Mar 04', deadlineRaw: '2026-03-04', updatedAt: '2026-03-07' },
+      { id: 9, title: 'Fix CSV export encoding bug', description: 'UTF-8 BOM not applied correctly for Excel compat', project: 'ERP System Migration', projectColor: '#8b5cf6', priority: 'Medium', status: 'To Do', deadline: 'Mar 01', deadlineRaw: '2026-03-01', updatedAt: '2026-03-02' },
+    ])
+
+    // Unique projects from data
+    const uniqueProjects = computed(() => {
+      return [...new Set(tasks.value.map(t => t.project))].sort()
+    })
+
+    // Summary stats (computed from tasks)
+    const summaryStats = computed(() => {
+      const all = tasks.value
+      const inProgress = all.filter(t => ['In Progress', 'Code Review', 'Testing'].includes(t.status))
+      const overdue = all.filter(t => t.deadlineRaw < TODAY && t.status !== 'Done')
+      const done = all.filter(t => t.status === 'Done')
+      return [
+        { label: 'Assigned Tasks', value: all.length, trend: '+3', trendUp: true, trendLabel: 'this week', iconBg: 'icon-bg-brand', icon: '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z"/></svg>' },
+        { label: 'In Progress', value: inProgress.length, trend: '+2', trendUp: true, trendLabel: 'this week', iconBg: 'icon-bg-blue', icon: '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>' },
+        { label: 'Overdue Tasks', value: overdue.length, trend: '+1', trendUp: false, trendLabel: 'vs last week', iconBg: 'icon-bg-red', icon: '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>' },
+        { label: 'Completed', value: done.length, trend: '+4', trendUp: true, trendLabel: 'this week', iconBg: 'icon-bg-emerald', icon: '<svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' },
+      ]
+    })
+
+    // Badge resolvers
+    const statusBadge = (status) => ({
+      'Backlog': 'badge-backlog', 'To Do': 'badge-todo', 'In Progress': 'badge-inprogress',
+      'Code Review': 'badge-codereview', 'Testing': 'badge-testing', 'Done': 'badge-done',
+    }[status] || 'badge-todo')
+
+    const priorityBadge = (priority) => ({
+      'Low': 'badge-low', 'Medium': 'badge-medium', 'High': 'badge-high', 'Critical': 'badge-critical',
+    }[priority] || 'badge-low')
+
+    const isOverdue = (dateStr) => dateStr < TODAY
+
+    // Overdue tasks (auto-computed from data)
+    const overdueTasks = computed(() => {
+      return tasks.value.filter(t => t.deadlineRaw < TODAY && t.status !== 'Done')
+        .sort((a, b) => a.deadlineRaw.localeCompare(b.deadlineRaw))
+    })
+
+    // Filtered & sorted tasks
+    const filteredTasks = computed(() => {
+      let result = [...tasks.value]
+
+      if (statusFilter.value !== 'all') result = result.filter(t => t.status === statusFilter.value)
+      if (priorityFilter.value !== 'all') result = result.filter(t => t.priority === priorityFilter.value)
+      if (projectFilter.value !== 'all') result = result.filter(t => t.project === projectFilter.value)
+
+      if (searchQuery.value.trim()) {
+        const q = searchQuery.value.toLowerCase()
+        result = result.filter(t =>
+          t.title.toLowerCase().includes(q) ||
+          t.description.toLowerCase().includes(q) ||
+          t.project.toLowerCase().includes(q)
+        )
+      }
+
+      switch (sortBy.value) {
+        case 'deadline': result.sort((a, b) => a.deadlineRaw.localeCompare(b.deadlineRaw)); break
+        case 'priority': result.sort((a, b) => (priorityWeight[b.priority] || 0) - (priorityWeight[a.priority] || 0)); break
+        case 'updated': result.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); break
+      }
+
+      return result
+    })
+
+    const handleCreateTask = () => alert('Create Task dialog — integrate with your modal component')
+    const handleViewTask = (task) => alert(`View task: ${task.title}\nProject: ${task.project}`)
+
+    return {
+      searchQuery, statusFilter, priorityFilter, projectFilter, sortBy,
+      statusOptions, priorityOptions,
+      tasks, uniqueProjects, summaryStats, filteredTasks, overdueTasks,
+      statusBadge, priorityBadge, isOverdue,
+      handleCreateTask, handleViewTask,
+    }
+  }
+}).mount('#app')
+</script>
+
+</body>
+</html>
