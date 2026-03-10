@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { Link, usePage } from '@inertiajs/vue3';
-import AppLogoIcon from '@/components/AppLogoIcon.vue';
-import { home } from '@/routes';
+import { usePage } from '@inertiajs/vue3';
 
 const page = usePage();
-const name = page.props.name;
+const appName = page.props.name as string;
 
 defineProps<{
     title?: string;
@@ -13,35 +11,103 @@ defineProps<{
 </script>
 
 <template>
-    <div
-        class="relative grid h-dvh flex-col items-center justify-center px-8 sm:px-0 lg:max-w-none lg:grid-cols-2 lg:px-0"
-    >
+    <div class="flex h-screen overflow-hidden">
+
+        <!-- ============================================================ -->
+        <!-- LEFT PANEL — Branding (hidden di mobile, muncul di lg+)      -->
+        <!-- ============================================================ -->
         <div
-            class="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex dark:border-r"
+            class="relative hidden flex-1 flex-col justify-between overflow-hidden p-10 text-white lg:flex"
+            style="background: #111827;"
         >
-            <div class="absolute inset-0 bg-zinc-900" />
-            <Link
-                :href="home()"
-                class="relative z-20 flex items-center text-lg font-medium"
-            >
-                <AppLogoIcon class="mr-2 size-8 fill-current text-white" />
-                {{ name }}
-            </Link>
-        </div>
-        <div class="lg:p-8">
+            <!-- Gradient blobs -->
             <div
-                class="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]"
-            >
-                <div class="flex flex-col space-y-2 text-center">
-                    <h1 class="text-xl font-medium tracking-tight" v-if="title">
-                        {{ title }}
-                    </h1>
-                    <p class="text-sm text-muted-foreground" v-if="description">
-                        {{ description }}
-                    </p>
+                class="pointer-events-none absolute inset-0 z-0"
+                style="background: radial-gradient(ellipse 80% 60% at 10% 90%, rgba(33,80,237,0.35) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 80% 20%, rgba(89,148,255,0.2) 0%, transparent 55%), radial-gradient(ellipse 50% 40% at 50% 50%, rgba(59,111,248,0.08) 0%, transparent 50%);"
+            />
+            <!-- Grid overlay -->
+            <div
+                class="pointer-events-none absolute inset-0 z-0"
+                style="opacity: 0.04; background-image: linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px); background-size: 48px 48px;"
+            />
+
+            <!-- Content -->
+            <div class="relative z-10">
+
+                <!-- Logo -->
+                <div class="mb-20 flex items-center gap-3">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600">
+                        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                        </svg>
+                    </div>
+                    <span class="text-[17px] font-bold tracking-tight">{{ appName }}</span>
                 </div>
-                <slot />
+
+                <!-- Headline -->
+                <h1 class="max-w-[440px] text-[36px] font-bold leading-[1.15] tracking-[-0.5px]">
+                    Manage projects <span class="text-blue-400">effortlessly</span> with your team.
+                </h1>
+                <p class="mt-4 max-w-[400px] text-[15px] leading-relaxed text-white/55">
+                    Track progress, collaborate in real-time, and deliver results on time — all from one unified dashboard.
+                </p>
+
+                <!-- Feature cards -->
+                <div class="mt-12 flex flex-col gap-3">
+
+                    <div class="flex max-w-[380px] items-center gap-3.5 rounded-xl border border-white/[0.08] bg-white/[0.06] px-[18px] py-3.5 backdrop-blur-sm">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400">
+                            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                            </svg>
+                        </div>
+                        <p class="text-[13px] leading-snug text-white/70">
+                            <strong class="font-semibold text-white">Real-time analytics</strong> — Live dashboards with project metrics and team performance insights.
+                        </p>
+                    </div>
+
+                    <div class="flex max-w-[380px] items-center gap-3.5 rounded-xl border border-white/[0.08] bg-white/[0.06] px-[18px] py-3.5 backdrop-blur-sm">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400">
+                            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                            </svg>
+                        </div>
+                        <p class="text-[13px] leading-snug text-white/70">
+                            <strong class="font-semibold text-white">Team collaboration</strong> — Assign tasks, track progress, and keep everyone aligned.
+                        </p>
+                    </div>
+
+                    <div class="flex max-w-[380px] items-center gap-3.5 rounded-xl border border-white/[0.08] bg-white/[0.06] px-[18px] py-3.5 backdrop-blur-sm">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400">
+                            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                            </svg>
+                        </div>
+                        <p class="text-[13px] leading-snug text-white/70">
+                            <strong class="font-semibold text-white">Enterprise security</strong> — SSO, role-based access, and audit logs built in.
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="relative z-10">
+                <p class="text-[12.5px] text-white/30">&copy; 2026 {{ appName }} — Internal IT Division</p>
             </div>
         </div>
+
+        <!-- ============================================================ -->
+        <!-- RIGHT PANEL — Form slot                                       -->
+        <!-- ============================================================ -->
+        <div class="relative flex w-full flex-col items-center justify-center bg-white px-8 lg:w-[520px] lg:min-w-[520px]">
+            <div class="w-full max-w-[380px]">
+                <slot />
+            </div>
+            <p class="absolute bottom-6 text-[11.5px] text-gray-400">
+                Secured by your organization's IT infrastructure
+            </p>
+        </div>
+
     </div>
 </template>
