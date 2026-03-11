@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ProjectStoreRequest;
 use App\Http\Requests\ProjectUpdateRequest;
 use App\Models\Project;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,9 +20,7 @@ class ProjectController extends Controller
         $workspaceId = $user->workspace_id;
 
         $query = Project::where('workspace_id', $workspaceId)
-            ->with([
-                'projectMembers' => fn ($q) => $q->where('role', 'project_manager')->with('user'),
-            ])
+            ->with(['projectMembers.user'])
             ->withCount('tasks');
 
         if ($search = $request->input('search')) {
@@ -47,35 +46,56 @@ class ProjectController extends Controller
         };
 
         $projects = $query->get()->map(function (Project $project) {
-            $manager = $project->projectMembers->first()?->user;
+            $managerPm = $project->projectMembers->first(fn ($pm) => $pm->role === 'project_manager');
+
+            $members = $project->projectMembers->map(fn ($pm) => [
+                'id'       => $pm->user->id,
+                'name'     => $pm->user->name,
+                'initials' => $this->initials($pm->user->name),
+                'role'     => $pm->role,
+                'joinedAt' => $pm->joined_at?->format('M d, Y'),
+            ])->values()->toArray();
 
             return [
-                'id'               => $project->id,
-                'name'             => $project->name,
-                'slug'             => $project->slug,
-                'description'      => $project->description,
-                'color'            => $project->color,
-                'status'           => $project->status,
-                'progress'         => $project->progress,
-                'start_date'       => $project->start_date?->format('Y-m-d'),
-                'deadline'         => $project->deadline?->format('Y-m-d'),
+                'id'                => $project->id,
+                'name'              => $project->name,
+                'slug'              => $project->slug,
+                'description'       => $project->description,
+                'color'             => $project->color,
+                'status'            => $project->status,
+                'progress'          => $project->progress,
+                'start_date'        => $project->start_date?->format('Y-m-d'),
+                'deadline'          => $project->deadline?->format('Y-m-d'),
                 'deadlineFormatted' => $project->deadline?->format('M d, Y'),
-                'taskCount'        => $project->tasks_count,
-                'manager'          => $manager ? [
-                    'name'     => $manager->name,
-                    'initials' => $this->initials($manager->name),
+                'taskCount'         => $project->tasks_count,
+                'members'           => $members,
+                'manager'           => $managerPm?->user ? [
+                    'name'     => $managerPm->user->name,
+                    'initials' => $this->initials($managerPm->user->name),
                 ] : null,
             ];
         })->values()->toArray();
 
+        $workspaceUsers = User::where('workspace_id', $workspaceId)
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($u) => [
+                'id'        => $u->id,
+                'name'      => $u->name,
+                'initials'  => $this->initials($u->name),
+                'job_title' => $u->job_title,
+            ])
+            ->toArray();
+
         return Inertia::render('Projects', [
-            'projects' => $projects,
-            'stats'    => $this->getStats($workspaceId),
-            'filters'  => [
+            'projects'       => $projects,
+            'stats'          => $this->getStats($workspaceId),
+            'filters'        => [
                 'search' => $request->input('search', ''),
                 'status' => $request->input('status', ''),
                 'sort'   => $sort,
             ],
+            'workspaceUsers' => $workspaceUsers,
         ]);
     }
 
