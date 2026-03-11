@@ -17,13 +17,13 @@ class DashboardController extends Controller
         $user        = Auth::user();
         $workspaceId = $user->workspace_id;
 
-        $doneStatusIds = TaskStatus::where('workspace_id', $workspaceId)
-            ->where('is_done', true)
-            ->pluck('id');
+        $doneStatusIds = $workspaceId
+            ? TaskStatus::where('workspace_id', $workspaceId)->where('is_done', true)->pluck('id')
+            : collect();
 
-        $inProgressId = TaskStatus::where('workspace_id', $workspaceId)
-            ->where('slug', 'in_progress')
-            ->value('id');
+        $inProgressId = $workspaceId
+            ? TaskStatus::where('workspace_id', $workspaceId)->where('slug', 'in_progress')->value('id')
+            : null;
 
         return Inertia::render('Dashboard', [
             'stats'          => $this->getStats($workspaceId, $doneStatusIds, $inProgressId),
@@ -33,8 +33,17 @@ class DashboardController extends Controller
         ]);
     }
 
-    private function getStats(int $workspaceId, $doneStatusIds, ?int $inProgressId): array
+    private function getStats(?int $workspaceId, $doneStatusIds, ?int $inProgressId): array
     {
+        if ($workspaceId === null) {
+            return [
+                'activeProjects' => 0, 'activeProjectsDiff' => 0,
+                'tasksInProgress' => 0, 'tasksInProgressDiff' => 0,
+                'overdueTasks' => 0, 'overdueTasksDiff' => 0,
+                'completedThisWeek' => 0, 'completedThisWeekDiff' => 0,
+            ];
+        }
+
         $now       = Carbon::now();
         $lastWeek  = $now->copy()->subWeek();
         $twoWeeks  = $now->copy()->subWeeks(2);
@@ -95,8 +104,11 @@ class DashboardController extends Controller
         ];
     }
 
-    private function getRecentProjects(int $workspaceId): array
+    private function getRecentProjects(?int $workspaceId): array
     {
+        if ($workspaceId === null) {
+            return [];
+        }
         return Project::where('workspace_id', $workspaceId)
             ->whereIn('status', ['active', 'planning', 'maintenance'])
             ->with([
@@ -130,7 +142,7 @@ class DashboardController extends Controller
         return Task::where('assigned_to', $userId)
             ->whereNotIn('task_status_id', $doneStatusIds)
             ->with(['status', 'project'])
-            ->orderByRaw("FIELD(priority, 'critical', 'high', 'medium', 'low')")
+            ->orderByRaw("CASE priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
             ->orderBy('deadline')
             ->limit(8)
             ->get()
@@ -146,8 +158,11 @@ class DashboardController extends Controller
             ->toArray();
     }
 
-    private function getRecentActivity(int $workspaceId): array
+    private function getRecentActivity(?int $workspaceId): array
     {
+        if ($workspaceId === null) {
+            return [];
+        }
         return ActivityLog::where('workspace_id', $workspaceId)
             ->with('user')
             ->orderByDesc('created_at')
