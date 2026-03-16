@@ -67,6 +67,7 @@ class TaskController extends Controller
             ->toArray();
 
         $projects = Project::where('workspace_id', $workspaceId)
+            ->whereHas('projectMembers', fn ($q) => $q->where('user_id', $user->id))
             ->orderBy('name')
             ->get(['id', 'name', 'color'])
             ->toArray();
