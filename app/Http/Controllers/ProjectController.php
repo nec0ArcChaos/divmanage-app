@@ -20,8 +20,7 @@ class ProjectController extends Controller
         $workspaceId = $user->workspace_id;
 
         $query = Project::where('workspace_id', $workspaceId)
-            ->with(['projectMembers.user'])
-            ->withCount('tasks');
+            ->with(['projectMembers.user', 'tasks.status', 'tasks.assignee']);
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -38,12 +37,13 @@ class ProjectController extends Controller
         }
 
         $sort = $request->input('sort', 'updated');
-        match ($sort) {
-            'deadline' => $query->orderByRaw('CASE WHEN deadline IS NULL THEN 1 ELSE 0 END')->orderBy('deadline'),
-            'name'     => $query->orderBy('name'),
-            'progress' => $query->orderByDesc('progress'),
-            default    => $query->orderByDesc('updated_at'),
-        };
+        if ($sort !== 'progress') {
+            match ($sort) {
+                'deadline' => $query->orderByRaw('CASE WHEN deadline IS NULL THEN 1 ELSE 0 END')->orderBy('deadline'),
+                'name'     => $query->orderBy('name'),
+                default    => $query->orderByDesc('updated_at'),
+            };
+        }
 
         $projects = $query->get()->map(function (Project $project) {
             $managerPm = $project->projectMembers->first(fn ($pm) => $pm->role === 'project_manager');
@@ -56,6 +56,49 @@ class ProjectController extends Controller
                 'joinedAt' => $pm->joined_at?->format('M d, Y'),
             ])->values()->toArray();
 
+            // Auto-calculate progress from done tasks
+            $totalTasks = $project->tasks->count();
+            $doneTasks  = $project->tasks->filter(fn ($t) => $t->status && $t->status->is_done)->count();
+            $progress   = $totalTasks > 0 ? (int) round(($doneTasks / $totalTasks) * 100) : 0;
+
+            // Status breakdown for mini-bar on cards
+            $statusSummary = $project->tasks
+                ->groupBy(fn ($t) => $t->status?->name ?? 'No Status')
+                ->map(fn ($tasks, $name) => [
+                    'name'    => $name,
+                    'color'   => $tasks->first()->status?->color ?? '#9ca3af',
+                    'is_done' => $tasks->first()->status?->is_done ?? false,
+                    'count'   => $tasks->count(),
+                ])
+                ->sortByDesc('is_done')
+                ->values()
+                ->toArray();
+
+            // Tasks grouped by assigned member
+            $tasksByMember = $project->tasks
+                ->groupBy(fn ($t) => $t->assigned_to ?? 0)
+                ->map(function ($tasks, $userId) {
+                    $user = $tasks->first()->assignee;
+                    return [
+                        'userId'   => $userId ?: null,
+                        'name'     => $user?->name ?? 'Unassigned',
+                        'initials' => $user ? $this->initials($user->name) : '??',
+                        'tasks'    => $tasks->map(fn ($t) => [
+                            'id'       => $t->id,
+                            'title'    => $t->title,
+                            'priority' => $t->priority,
+                            'deadline' => $t->deadline?->format('M d, Y'),
+                            'status'   => $t->status ? [
+                                'name'    => $t->status->name,
+                                'color'   => $t->status->color,
+                                'is_done' => $t->status->is_done,
+                            ] : null,
+                        ])->values()->toArray(),
+                    ];
+                })
+                ->values()
+                ->toArray();
+
             return [
                 'id'                => $project->id,
                 'name'              => $project->name,
@@ -63,18 +106,27 @@ class ProjectController extends Controller
                 'description'       => $project->description,
                 'color'             => $project->color,
                 'status'            => $project->status,
-                'progress'          => $project->progress,
+                'progress'          => $progress,
+                'doneCount'         => $doneTasks,
                 'start_date'        => $project->start_date?->format('Y-m-d'),
                 'deadline'          => $project->deadline?->format('Y-m-d'),
                 'deadlineFormatted' => $project->deadline?->format('M d, Y'),
-                'taskCount'         => $project->tasks_count,
+                'taskCount'         => $totalTasks,
+                'statusSummary'     => $statusSummary,
+                'tasksByMember'     => $tasksByMember,
                 'members'           => $members,
                 'manager'           => $managerPm?->user ? [
                     'name'     => $managerPm->user->name,
                     'initials' => $this->initials($managerPm->user->name),
                 ] : null,
             ];
-        })->values()->toArray();
+        });
+
+        if ($sort === 'progress') {
+            $projects = $projects->sortByDesc('progress');
+        }
+
+        $projects = $projects->values()->toArray();
 
         $workspaceUsers = User::where('workspace_id', $workspaceId)
             ->orderBy('name')
@@ -112,7 +164,6 @@ class ProjectController extends Controller
             'description'  => $validated['description'] ?? null,
             'color'        => $validated['color'],
             'status'       => $validated['status'],
-            'progress'     => $validated['progress'],
             'start_date'   => $validated['start_date'] ?: null,
             'deadline'     => $validated['deadline'] ?: null,
             'created_by'   => $user->id,
@@ -136,7 +187,6 @@ class ProjectController extends Controller
             'description' => $validated['description'] ?? null,
             'color'       => $validated['color'],
             'status'      => $validated['status'],
-            'progress'    => $validated['progress'],
             'start_date'  => $validated['start_date'] ?: null,
             'deadline'    => $validated['deadline'] ?: null,
         ]);

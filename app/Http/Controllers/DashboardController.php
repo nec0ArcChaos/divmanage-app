@@ -113,25 +113,29 @@ class DashboardController extends Controller
             ->whereIn('status', ['active', 'planning', 'maintenance'])
             ->with([
                 'projectMembers' => fn ($q) => $q->where('role', 'project_manager')->with('user'),
+                'tasks.status',
             ])
-            ->withCount('tasks')
             ->orderByDesc('updated_at')
             ->limit(6)
             ->get()
             ->map(function (Project $project) {
-                $manager = $project->projectMembers->first()?->user;
+                $manager    = $project->projectMembers->first()?->user;
+                $totalTasks = $project->tasks->count();
+                $doneTasks  = $project->tasks->filter(fn ($t) => $t->status && $t->status->is_done)->count();
+                $progress   = $totalTasks > 0 ? (int) round(($doneTasks / $totalTasks) * 100) : 0;
                 return [
                     'id'        => $project->id,
                     'name'      => $project->name,
                     'color'     => $project->color,
                     'status'    => $project->status,
-                    'progress'  => $project->progress,
+                    'progress'  => $progress,
+                    'doneCount' => $doneTasks,
                     'deadline'  => $project->deadline?->format('M d, Y'),
                     'manager'   => $manager ? [
                         'name'     => $manager->name,
                         'initials' => $this->initials($manager->name),
                     ] : null,
-                    'taskCount' => $project->tasks_count,
+                    'taskCount' => $totalTasks,
                 ];
             })
             ->toArray();

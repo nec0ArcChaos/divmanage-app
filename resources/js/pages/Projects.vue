@@ -27,7 +27,7 @@ defineOptions({ layout: DashboardLayout });
 // ── Types ──────────────────────────────────────────────────────────────────
 type ProjectStatus = 'planning' | 'active' | 'maintenance' | 'completed' | 'archived';
 type MemberRole    = 'project_manager' | 'developer' | 'qa' | 'designer' | 'viewer';
-type SlideOverTab  = 'details' | 'members';
+type SlideOverTab  = 'details' | 'members' | 'tasks';
 
 interface ProjectStats {
     total: number;
@@ -49,6 +49,34 @@ interface ProjectMember {
     joinedAt: string | null;
 }
 
+interface TaskStatusInfo {
+    name: string;
+    color: string;
+    is_done: boolean;
+}
+
+interface MemberTask {
+    id: number;
+    title: string;
+    priority: string;
+    deadline: string | null;
+    status: TaskStatusInfo | null;
+}
+
+interface MemberTaskGroup {
+    userId: number | null;
+    name: string;
+    initials: string;
+    tasks: MemberTask[];
+}
+
+interface StatusSummaryItem {
+    name: string;
+    color: string;
+    is_done: boolean;
+    count: number;
+}
+
 interface ProjectItem {
     id: number;
     name: string;
@@ -57,10 +85,13 @@ interface ProjectItem {
     color: string;
     status: ProjectStatus;
     progress: number;
+    doneCount: number;
     start_date: string | null;
     deadline: string | null;
     deadlineFormatted: string | null;
     taskCount: number;
+    statusSummary: StatusSummaryItem[];
+    tasksByMember: MemberTaskGroup[];
     members: ProjectMember[];
     manager: ProjectManager | null;
 }
@@ -78,7 +109,6 @@ interface ProjectFormData {
     color: string;
     start_date: string;
     deadline: string;
-    progress: number;
 }
 
 interface WorkspaceUser {
@@ -167,7 +197,7 @@ function resetFilters() {
 // ── Create form ────────────────────────────────────────────────────────────
 const createForm = useForm<ProjectFormData>({
     name: '', description: '', status: 'planning',
-    color: '#3b6ff8', start_date: '', deadline: '', progress: 0,
+    color: '#3b6ff8', start_date: '', deadline: '',
 });
 
 function openCreateModal() {
@@ -185,7 +215,7 @@ function submitCreate() {
 // ── Edit form ──────────────────────────────────────────────────────────────
 const editForm = useForm<ProjectFormData>({
     name: '', description: '', status: 'planning',
-    color: '#3b6ff8', start_date: '', deadline: '', progress: 0,
+    color: '#3b6ff8', start_date: '', deadline: '',
 });
 
 function openProject(project: ProjectItem) {
@@ -204,7 +234,6 @@ function startEditing() {
     editForm.color       = p.color;
     editForm.start_date  = p.start_date ?? '';
     editForm.deadline    = p.deadline ?? '';
-    editForm.progress    = p.progress;
     editForm.clearErrors();
     slideOverEditing.value = true;
 }
@@ -294,6 +323,16 @@ function statusBadge(status: string) {
         archived:    { label: 'Archived',    classes: 'bg-gray-100 text-gray-400'    },
     };
     return map[status] ?? { label: status, classes: 'bg-gray-100 text-gray-500' };
+}
+
+function priorityBadge(priority: string): string {
+    const map: Record<string, string> = {
+        critical: 'bg-red-100 text-red-700',
+        high:     'bg-orange-100 text-orange-700',
+        medium:   'bg-yellow-100 text-yellow-700',
+        low:      'bg-gray-100 text-gray-500',
+    };
+    return map[priority] ?? 'bg-gray-100 text-gray-500';
 }
 </script>
 
@@ -415,10 +454,24 @@ function statusBadge(status: string) {
             <div class="mb-4">
                 <div class="mb-1.5 flex items-center justify-between">
                     <span class="text-[11.5px] text-gray-400">Progress</span>
-                    <span class="text-[12px] font-semibold text-gray-600">{{ project.progress }}%</span>
+                    <span class="text-[12px] font-semibold text-gray-600">
+                        {{ project.taskCount > 0 ? `${project.doneCount}/${project.taskCount} done` : 'No tasks' }}
+                        <span class="ml-1 text-gray-400">({{ project.progress }}%)</span>
+                    </span>
                 </div>
                 <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
                     <div class="h-full rounded-full bg-blue-500 transition-all duration-500" :style="{ width: project.progress + '%' }" />
+                </div>
+                <div v-if="project.statusSummary.length > 0" class="mt-2 flex flex-wrap gap-1.5">
+                    <span
+                        v-for="s in project.statusSummary"
+                        :key="s.name"
+                        class="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
+                        :style="{ backgroundColor: s.color + '20', color: s.color }"
+                    >
+                        <span class="h-1.5 w-1.5 rounded-full" :style="{ backgroundColor: s.color }" />
+                        {{ s.count }} {{ s.name }}
+                    </span>
                 </div>
             </div>
             <div class="flex items-center justify-between">
@@ -481,6 +534,7 @@ function statusBadge(status: string) {
                             </div>
                             <span class="text-[12px] text-gray-500">{{ project.progress }}%</span>
                         </div>
+                        <p class="mt-0.5 text-[11px] text-gray-400">{{ project.doneCount }}/{{ project.taskCount }} done</p>
                     </td>
                     <td class="px-4 py-3.5 text-gray-500">{{ project.deadlineFormatted ?? '—' }}</td>
                     <td class="px-4 py-3.5 text-gray-500">{{ project.taskCount }}</td>
@@ -570,11 +624,6 @@ function statusBadge(status: string) {
                                         <InputError :message="createForm.errors.deadline" />
                                     </div>
                                 </div>
-                                <div class="flex flex-col gap-1.5">
-                                    <label class="text-[13px] font-semibold text-gray-700">Initial Progress — {{ createForm.progress }}%</label>
-                                    <input v-model.number="createForm.progress" type="range" min="0" max="100" class="w-full accent-blue-600" />
-                                    <InputError :message="createForm.errors.progress" />
-                                </div>
                             </div>
                         </form>
                         <div class="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
@@ -629,6 +678,16 @@ function statusBadge(status: string) {
                         :class="['mr-6 border-b-2 py-3 text-[13px] font-medium transition', slideOverTab === 'details' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-400 hover:text-gray-600']"
                         @click="slideOverTab = 'details'; slideOverEditing = false"
                     >Details</button>
+                    <button
+                        :class="['mr-6 flex items-center gap-1.5 border-b-2 py-3 text-[13px] font-medium transition', slideOverTab === 'tasks' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-400 hover:text-gray-600']"
+                        @click="slideOverTab = 'tasks'"
+                    >
+                        <CheckSquare class="size-3.5" />
+                        Tasks
+                        <span class="rounded-full bg-gray-100 px-1.5 py-0.5 text-[11px] font-semibold text-gray-600">
+                            {{ selectedProject.taskCount }}
+                        </span>
+                    </button>
                     <button
                         :class="['flex items-center gap-1.5 border-b-2 py-3 text-[13px] font-medium transition', slideOverTab === 'members' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-400 hover:text-gray-600']"
                         @click="slideOverTab = 'members'"
@@ -736,12 +795,101 @@ function statusBadge(status: string) {
                                         <InputError :message="editForm.errors.deadline" />
                                     </div>
                                 </div>
-                                <div class="flex flex-col gap-1.5">
-                                    <label class="text-[13px] font-semibold text-gray-700">Progress — {{ editForm.progress }}%</label>
-                                    <input v-model.number="editForm.progress" type="range" min="0" max="100" class="w-full accent-blue-600" />
-                                    <InputError :message="editForm.errors.progress" />
+                                <div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+                                    <p class="mb-1 text-[11px] font-semibold uppercase tracking-wider text-blue-400">Auto-calculated Progress</p>
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex-1 h-1.5 overflow-hidden rounded-full bg-blue-100">
+                                            <div class="h-full rounded-full bg-blue-500" :style="{ width: selectedProject!.progress + '%' }" />
+                                        </div>
+                                        <span class="text-[12px] font-semibold text-blue-700">{{ selectedProject!.doneCount }}/{{ selectedProject!.taskCount }} done ({{ selectedProject!.progress }}%)</span>
+                                    </div>
                                 </div>
                             </form>
+                        </template>
+                    </template>
+
+                    <!-- ════════════════════════════════════════════════════ -->
+                    <!-- TASKS TAB                                           -->
+                    <!-- ════════════════════════════════════════════════════ -->
+                    <template v-else-if="slideOverTab === 'tasks'">
+
+                        <!-- Empty state -->
+                        <div v-if="selectedProject.taskCount === 0" class="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 py-10 text-center">
+                            <CheckSquare class="mb-3 size-8 text-gray-300" />
+                            <p class="text-[13px] font-medium text-gray-500">No tasks yet</p>
+                            <p class="mt-0.5 text-[12px] text-gray-400">Tasks assigned to members will appear here.</p>
+                        </div>
+
+                        <template v-else>
+                            <!-- Progress summary -->
+                            <div class="mb-5 rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+                                <div class="mb-2 flex items-center justify-between">
+                                    <span class="text-[12px] font-semibold text-gray-700">Overall Progress</span>
+                                    <span class="text-[13px] font-bold text-gray-900">{{ selectedProject.doneCount }}/{{ selectedProject.taskCount }} done</span>
+                                </div>
+                                <div class="mb-3 h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                                    <div class="h-full rounded-full bg-blue-500 transition-all duration-500" :style="{ width: selectedProject.progress + '%' }" />
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <div
+                                        v-for="s in selectedProject.statusSummary"
+                                        :key="s.name"
+                                        class="flex items-center gap-1.5 rounded-lg px-2.5 py-1"
+                                        :style="{ backgroundColor: s.color + '18' }"
+                                    >
+                                        <span class="h-2 w-2 shrink-0 rounded-full" :style="{ backgroundColor: s.color }" />
+                                        <span class="text-[11.5px] font-semibold" :style="{ color: s.color }">{{ s.count }}</span>
+                                        <span class="text-[11.5px] text-gray-600">{{ s.name }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tasks grouped by member -->
+                            <div class="space-y-5">
+                                <div v-for="group in selectedProject.tasksByMember" :key="group.userId ?? 'unassigned'">
+                                    <!-- Member header -->
+                                    <div class="mb-2 flex items-center gap-2">
+                                        <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                                            {{ group.initials }}
+                                        </div>
+                                        <span class="text-[13px] font-semibold text-gray-800">{{ group.name }}</span>
+                                        <span class="text-[11.5px] text-gray-400">· {{ group.tasks.length }} task{{ group.tasks.length !== 1 ? 's' : '' }}</span>
+                                        <span class="ml-auto text-[11.5px] text-gray-400">
+                                            {{ group.tasks.filter(t => t.status?.is_done).length }} done
+                                        </span>
+                                    </div>
+                                    <!-- Task rows -->
+                                    <div class="flex flex-col gap-1.5 pl-9">
+                                        <div
+                                            v-for="task in group.tasks"
+                                            :key="task.id"
+                                            class="flex items-center gap-2.5 rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-sm"
+                                        >
+                                            <!-- Status dot -->
+                                            <span
+                                                class="h-2 w-2 shrink-0 rounded-full"
+                                                :style="{ backgroundColor: task.status?.color ?? '#9ca3af' }"
+                                            />
+                                            <!-- Task title -->
+                                            <span
+                                                class="min-w-0 flex-1 truncate text-[12.5px]"
+                                                :class="task.status?.is_done ? 'text-gray-400 line-through' : 'text-gray-700'"
+                                            >{{ task.title }}</span>
+                                            <!-- Status badge -->
+                                            <span
+                                                v-if="task.status"
+                                                class="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
+                                                :style="{ backgroundColor: task.status.color + '20', color: task.status.color }"
+                                            >{{ task.status.name }}</span>
+                                            <!-- Priority badge -->
+                                            <span
+                                                class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize"
+                                                :class="priorityBadge(task.priority)"
+                                            >{{ task.priority }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </template>
                     </template>
 
