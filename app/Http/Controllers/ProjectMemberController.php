@@ -13,7 +13,7 @@ class ProjectMemberController extends Controller
 {
     public function store(Request $request, Project $project)
     {
-        $this->authorizeWorkspace($project);
+        $this->authorizeProjectManager($project);
 
         $validated = $request->validate([
             'user_id' => ['required', 'integer', 'exists:users,id'],
@@ -46,7 +46,7 @@ class ProjectMemberController extends Controller
 
     public function update(Request $request, Project $project, User $user)
     {
-        $this->authorizeWorkspace($project);
+        $this->authorizeProjectManager($project);
 
         $validated = $request->validate([
             'role' => ['required', Rule::in(['project_manager', 'developer', 'qa', 'designer', 'viewer'])],
@@ -62,7 +62,7 @@ class ProjectMemberController extends Controller
 
     public function destroy(Project $project, User $user)
     {
-        $this->authorizeWorkspace($project);
+        $this->authorizeProjectManager($project);
 
         $project->projectMembers()
             ->where('user_id', $user->id)
@@ -72,9 +72,16 @@ class ProjectMemberController extends Controller
         return redirect()->route('projects.index');
     }
 
-    private function authorizeWorkspace(Project $project): void
+    private function authorizeProjectManager(Project $project): void
     {
         if ($project->workspace_id !== Auth::user()->workspace_id) {
+            abort(403);
+        }
+
+        if (! $project->projectMembers()
+            ->where('user_id', Auth::id())
+            ->where('role', 'project_manager')
+            ->exists()) {
             abort(403);
         }
     }

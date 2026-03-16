@@ -26,7 +26,6 @@ class ProjectUpdateRequest extends FormRequest
             'color'       => ['required', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'start_date'  => ['nullable', 'date', 'before_or_equal:deadline'],
             'deadline'    => ['nullable', 'date', 'after_or_equal:start_date'],
-            'progress'    => ['required', 'integer', 'min:0', 'max:100'],
         ];
     }
 

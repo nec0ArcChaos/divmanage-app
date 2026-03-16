@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     Calendar,
     CheckCircle2,
@@ -12,6 +12,7 @@ import {
     FolderOpen,
     Grid3X3,
     LayoutList,
+    Lock,
     Plus,
     Search,
     Trash2,
@@ -21,13 +22,14 @@ import {
 } from 'lucide-vue-next';
 import DashboardLayout from '@/layouts/DashboardLayout.vue';
 import InputError from '@/components/InputError.vue';
+import TomSelectInput from '@/components/TomSelectInput.vue';
 
 defineOptions({ layout: DashboardLayout });
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type ProjectStatus = 'planning' | 'active' | 'maintenance' | 'completed' | 'archived';
 type MemberRole    = 'project_manager' | 'developer' | 'qa' | 'designer' | 'viewer';
-type SlideOverTab  = 'details' | 'members';
+type SlideOverTab  = 'details' | 'members' | 'tasks';
 
 interface ProjectStats {
     total: number;
@@ -47,6 +49,44 @@ interface ProjectMember {
     initials: string;
     role: MemberRole;
     joinedAt: string | null;
+    isCreator: boolean;
+}
+
+interface TaskStatusOption {
+    id: number;
+    name: string;
+    color: string;
+    is_done: boolean;
+}
+
+interface TaskStatusInfo {
+    name: string;
+    color: string;
+    is_done: boolean;
+}
+
+interface MemberTask {
+    id: number;
+    title: string;
+    priority: string;
+    deadline: string | null;
+    status: TaskStatusInfo | null;
+    assignorName: string;
+    assignedAt: string | null;
+}
+
+interface MemberTaskGroup {
+    userId: number | null;
+    name: string;
+    initials: string;
+    tasks: MemberTask[];
+}
+
+interface StatusSummaryItem {
+    name: string;
+    color: string;
+    is_done: boolean;
+    count: number;
 }
 
 interface ProjectItem {
@@ -57,10 +97,14 @@ interface ProjectItem {
     color: string;
     status: ProjectStatus;
     progress: number;
+    doneCount: number;
+    createdBy: number;
     start_date: string | null;
     deadline: string | null;
     deadlineFormatted: string | null;
     taskCount: number;
+    statusSummary: StatusSummaryItem[];
+    tasksByMember: MemberTaskGroup[];
     members: ProjectMember[];
     manager: ProjectManager | null;
 }
@@ -78,7 +122,6 @@ interface ProjectFormData {
     color: string;
     start_date: string;
     deadline: string;
-    progress: number;
 }
 
 interface WorkspaceUser {
@@ -94,6 +137,7 @@ const props = defineProps<{
     stats: ProjectStats;
     filters: ProjectFilters;
     workspaceUsers: WorkspaceUser[];
+    taskStatuses: TaskStatusOption[];
 }>();
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -108,6 +152,13 @@ const ROLE_LABELS: Record<MemberRole, string> = {
     qa:              'QA',
     designer:        'Designer',
     viewer:          'Viewer',
+};
+
+const ROLE_LABELS_NO_PM: Record<string, string> = {
+    developer: 'Developer',
+    qa:        'QA',
+    designer:  'Designer',
+    viewer:    'Viewer',
 };
 
 const ROLE_COLORS: Record<MemberRole, string> = {
@@ -125,12 +176,17 @@ const statCards = [
     { label: 'Completed',      key: 'completed'    as const, icon: CheckCircle2, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600'},
 ];
 
+// ── Auth ───────────────────────────────────────────────────────────────────
+const page = usePage();
+const currentUserId = computed(() => (page.props.auth as any)?.user?.id ?? null);
+
 // ── View state ─────────────────────────────────────────────────────────────
 const viewMode = ref<'grid' | 'list'>('grid');
 
 // ── Slide-over state ───────────────────────────────────────────────────────
 const showCreateModal  = ref(false);
 const showSlideOver    = ref(false);
+const showTaskModal    = ref(false);
 const selectedProject  = ref<ProjectItem | null>(null);
 const slideOverTab     = ref<SlideOverTab>('details');
 const slideOverEditing = ref(false);
@@ -167,7 +223,7 @@ function resetFilters() {
 // ── Create form ────────────────────────────────────────────────────────────
 const createForm = useForm<ProjectFormData>({
     name: '', description: '', status: 'planning',
-    color: '#3b6ff8', start_date: '', deadline: '', progress: 0,
+    color: '#3b6ff8', start_date: '', deadline: '',
 });
 
 function openCreateModal() {
@@ -185,7 +241,7 @@ function submitCreate() {
 // ── Edit form ──────────────────────────────────────────────────────────────
 const editForm = useForm<ProjectFormData>({
     name: '', description: '', status: 'planning',
-    color: '#3b6ff8', start_date: '', deadline: '', progress: 0,
+    color: '#3b6ff8', start_date: '', deadline: '',
 });
 
 function openProject(project: ProjectItem) {
@@ -204,7 +260,6 @@ function startEditing() {
     editForm.color       = p.color;
     editForm.start_date  = p.start_date ?? '';
     editForm.deadline    = p.deadline ?? '';
-    editForm.progress    = p.progress;
     editForm.clearErrors();
     slideOverEditing.value = true;
 }
@@ -234,6 +289,24 @@ const availableUsers = computed<WorkspaceUser[]>(() => {
     if (!selectedProject.value) return props.workspaceUsers;
     const memberIds = new Set(selectedProject.value.members.map(m => m.id));
     return props.workspaceUsers.filter(u => !memberIds.has(u.id));
+});
+
+const availableMemberOptions = computed(() =>
+    availableUsers.value.map(u => ({
+        value: u.id,
+        label: u.name + (u.job_title ? ` — ${u.job_title}` : ''),
+    }))
+);
+
+const memberTaskOptions = computed(() =>
+    selectedProject.value?.members.map(m => ({ value: m.id, label: m.name })) ?? []
+);
+
+const isCurrentUserPM = computed(() => {
+    if (!selectedProject.value) return false;
+    return selectedProject.value.members.some(
+        m => m.id === currentUserId.value && m.role === 'project_manager'
+    );
 });
 
 function addMember() {
@@ -284,6 +357,35 @@ function refreshSelected() {
     if (updated) selectedProject.value = updated;
 }
 
+// ── Task creation (from project slide-over) ────────────────────────────────
+const taskForm = useForm({
+    title:          '',
+    task_status_id: '' as number | '',
+    priority:       'medium',
+    assigned_to:    '' as number | '',
+    deadline:       '',
+});
+
+function openTaskModal() {
+    taskForm.reset();
+    taskForm.priority = 'medium';
+    showTaskModal.value = true;
+}
+
+function submitTask() {
+    if (!selectedProject.value) return;
+    taskForm.post(`/projects/${selectedProject.value.id}/tasks`, {
+        preserveState:  true,
+        preserveScroll: true,
+        onSuccess: () => {
+            showTaskModal.value = false;
+            taskForm.reset();
+            taskForm.priority = 'medium';
+            refreshSelected();
+        },
+    });
+}
+
 // ── Utilities ──────────────────────────────────────────────────────────────
 function statusBadge(status: string) {
     const map: Record<string, { label: string; classes: string }> = {
@@ -294,6 +396,16 @@ function statusBadge(status: string) {
         archived:    { label: 'Archived',    classes: 'bg-gray-100 text-gray-400'    },
     };
     return map[status] ?? { label: status, classes: 'bg-gray-100 text-gray-500' };
+}
+
+function priorityBadge(priority: string): string {
+    const map: Record<string, string> = {
+        critical: 'bg-red-100 text-red-700',
+        high:     'bg-orange-100 text-orange-700',
+        medium:   'bg-yellow-100 text-yellow-700',
+        low:      'bg-gray-100 text-gray-500',
+    };
+    return map[priority] ?? 'bg-gray-100 text-gray-500';
 }
 </script>
 
@@ -415,10 +527,24 @@ function statusBadge(status: string) {
             <div class="mb-4">
                 <div class="mb-1.5 flex items-center justify-between">
                     <span class="text-[11.5px] text-gray-400">Progress</span>
-                    <span class="text-[12px] font-semibold text-gray-600">{{ project.progress }}%</span>
+                    <span class="text-[12px] font-semibold text-gray-600">
+                        {{ project.taskCount > 0 ? `${project.doneCount}/${project.taskCount} done` : 'No tasks' }}
+                        <span class="ml-1 text-gray-400">({{ project.progress }}%)</span>
+                    </span>
                 </div>
                 <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
                     <div class="h-full rounded-full bg-blue-500 transition-all duration-500" :style="{ width: project.progress + '%' }" />
+                </div>
+                <div v-if="project.statusSummary.length > 0" class="mt-2 flex flex-wrap gap-1.5">
+                    <span
+                        v-for="s in project.statusSummary"
+                        :key="s.name"
+                        class="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
+                        :style="{ backgroundColor: s.color + '20', color: s.color }"
+                    >
+                        <span class="h-1.5 w-1.5 rounded-full" :style="{ backgroundColor: s.color }" />
+                        {{ s.count }} {{ s.name }}
+                    </span>
                 </div>
             </div>
             <div class="flex items-center justify-between">
@@ -481,6 +607,7 @@ function statusBadge(status: string) {
                             </div>
                             <span class="text-[12px] text-gray-500">{{ project.progress }}%</span>
                         </div>
+                        <p class="mt-0.5 text-[11px] text-gray-400">{{ project.doneCount }}/{{ project.taskCount }} done</p>
                     </td>
                     <td class="px-4 py-3.5 text-gray-500">{{ project.deadlineFormatted ?? '—' }}</td>
                     <td class="px-4 py-3.5 text-gray-500">{{ project.taskCount }}</td>
@@ -570,11 +697,6 @@ function statusBadge(status: string) {
                                         <InputError :message="createForm.errors.deadline" />
                                     </div>
                                 </div>
-                                <div class="flex flex-col gap-1.5">
-                                    <label class="text-[13px] font-semibold text-gray-700">Initial Progress — {{ createForm.progress }}%</label>
-                                    <input v-model.number="createForm.progress" type="range" min="0" max="100" class="w-full accent-blue-600" />
-                                    <InputError :message="createForm.errors.progress" />
-                                </div>
                             </div>
                         </form>
                         <div class="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
@@ -611,12 +733,18 @@ function statusBadge(status: string) {
                         <h2 class="truncate text-[15px] font-semibold text-gray-900">{{ selectedProject.name }}</h2>
                     </div>
                     <div class="ml-3 flex shrink-0 items-center gap-2">
-                        <!-- Edit button — only on details tab, not in edit mode -->
+                        <!-- Edit button — only on details tab, not in edit mode, PM only -->
                         <button
-                            v-if="slideOverTab === 'details' && !slideOverEditing"
+                            v-if="slideOverTab === 'details' && !slideOverEditing && isCurrentUserPM"
                             class="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-[12px] font-medium text-gray-600 transition hover:bg-gray-50"
                             @click="startEditing"
                         ><Edit2 class="size-3.5" /> Edit</button>
+                        <!-- Tambah Task button — only on tasks tab, PM only -->
+                        <button
+                            v-else-if="slideOverTab === 'tasks' && isCurrentUserPM"
+                            class="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-blue-700"
+                            @click="openTaskModal"
+                        ><Plus class="size-3.5" /> Tambah Task</button>
                         <button class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" @click="showSlideOver = false">
                             <X class="size-5" />
                         </button>
@@ -629,6 +757,16 @@ function statusBadge(status: string) {
                         :class="['mr-6 border-b-2 py-3 text-[13px] font-medium transition', slideOverTab === 'details' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-400 hover:text-gray-600']"
                         @click="slideOverTab = 'details'; slideOverEditing = false"
                     >Details</button>
+                    <button
+                        :class="['mr-6 flex items-center gap-1.5 border-b-2 py-3 text-[13px] font-medium transition', slideOverTab === 'tasks' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-400 hover:text-gray-600']"
+                        @click="slideOverTab = 'tasks'"
+                    >
+                        <CheckSquare class="size-3.5" />
+                        Tasks
+                        <span class="rounded-full bg-gray-100 px-1.5 py-0.5 text-[11px] font-semibold text-gray-600">
+                            {{ selectedProject.taskCount }}
+                        </span>
+                    </button>
                     <button
                         :class="['flex items-center gap-1.5 border-b-2 py-3 text-[13px] font-medium transition', slideOverTab === 'members' ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-400 hover:text-gray-600']"
                         @click="slideOverTab = 'members'"
@@ -736,12 +874,112 @@ function statusBadge(status: string) {
                                         <InputError :message="editForm.errors.deadline" />
                                     </div>
                                 </div>
-                                <div class="flex flex-col gap-1.5">
-                                    <label class="text-[13px] font-semibold text-gray-700">Progress — {{ editForm.progress }}%</label>
-                                    <input v-model.number="editForm.progress" type="range" min="0" max="100" class="w-full accent-blue-600" />
-                                    <InputError :message="editForm.errors.progress" />
+                                <div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+                                    <p class="mb-1 text-[11px] font-semibold uppercase tracking-wider text-blue-400">Auto-calculated Progress</p>
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex-1 h-1.5 overflow-hidden rounded-full bg-blue-100">
+                                            <div class="h-full rounded-full bg-blue-500" :style="{ width: selectedProject!.progress + '%' }" />
+                                        </div>
+                                        <span class="text-[12px] font-semibold text-blue-700">{{ selectedProject!.doneCount }}/{{ selectedProject!.taskCount }} done ({{ selectedProject!.progress }}%)</span>
+                                    </div>
                                 </div>
                             </form>
+                        </template>
+                    </template>
+
+                    <!-- ════════════════════════════════════════════════════ -->
+                    <!-- TASKS TAB                                           -->
+                    <!-- ════════════════════════════════════════════════════ -->
+                    <template v-else-if="slideOverTab === 'tasks'">
+
+                        <!-- Empty state -->
+                        <div v-if="selectedProject.taskCount === 0" class="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 py-10 text-center">
+                            <CheckSquare class="mb-3 size-8 text-gray-300" />
+                            <p class="text-[13px] font-medium text-gray-500">No tasks yet</p>
+                            <p class="mt-0.5 text-[12px] text-gray-400">Tasks assigned to members will appear here.</p>
+                            <button
+                                v-if="isCurrentUserPM"
+                                class="mt-4 flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-blue-700"
+                                @click="openTaskModal"
+                            ><Plus class="size-3.5" /> Tambah Task Pertama</button>
+                        </div>
+
+                        <template v-else>
+                            <!-- Progress summary -->
+                            <div class="mb-5 rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+                                <div class="mb-2 flex items-center justify-between">
+                                    <span class="text-[12px] font-semibold text-gray-700">Overall Progress</span>
+                                    <span class="text-[13px] font-bold text-gray-900">{{ selectedProject.doneCount }}/{{ selectedProject.taskCount }} done</span>
+                                </div>
+                                <div class="mb-3 h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                                    <div class="h-full rounded-full bg-blue-500 transition-all duration-500" :style="{ width: selectedProject.progress + '%' }" />
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <div
+                                        v-for="s in selectedProject.statusSummary"
+                                        :key="s.name"
+                                        class="flex items-center gap-1.5 rounded-lg px-2.5 py-1"
+                                        :style="{ backgroundColor: s.color + '18' }"
+                                    >
+                                        <span class="h-2 w-2 shrink-0 rounded-full" :style="{ backgroundColor: s.color }" />
+                                        <span class="text-[11.5px] font-semibold" :style="{ color: s.color }">{{ s.count }}</span>
+                                        <span class="text-[11.5px] text-gray-600">{{ s.name }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tasks grouped by member -->
+                            <div class="space-y-5">
+                                <div v-for="group in selectedProject.tasksByMember" :key="group.userId ?? 'unassigned'">
+                                    <!-- Member header -->
+                                    <div class="mb-2 flex items-center gap-2">
+                                        <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                                            {{ group.initials }}
+                                        </div>
+                                        <span class="text-[13px] font-semibold text-gray-800">{{ group.name }}</span>
+                                        <span class="text-[11.5px] text-gray-400">· {{ group.tasks.length }} task{{ group.tasks.length !== 1 ? 's' : '' }}</span>
+                                        <span class="ml-auto text-[11.5px] text-gray-400">
+                                            {{ group.tasks.filter(t => t.status?.is_done).length }} done
+                                        </span>
+                                    </div>
+                                    <!-- Task rows -->
+                                    <div class="flex flex-col gap-1.5 pl-9">
+                                        <div
+                                            v-for="task in group.tasks"
+                                            :key="task.id"
+                                            class="flex items-center gap-2.5 rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-sm"
+                                        >
+                                            <!-- Status dot -->
+                                            <span
+                                                class="h-2 w-2 shrink-0 rounded-full"
+                                                :style="{ backgroundColor: task.status?.color ?? '#9ca3af' }"
+                                            />
+                                            <!-- Task title + assignor -->
+                                            <div class="min-w-0 flex-1 overflow-hidden">
+                                                <span
+                                                    class="block truncate text-[12.5px]"
+                                                    :class="task.status?.is_done ? 'text-gray-400 line-through' : 'text-gray-700'"
+                                                >{{ task.title }}</span>
+                                                <span class="block truncate text-[10.5px] text-gray-400">
+                                                    by {{ task.assignorName }}<template v-if="task.assignedAt"> · {{ task.assignedAt }}</template>
+                                                </span>
+                                            </div>
+                                            <!-- Status badge -->
+                                            <span
+                                                v-if="task.status"
+                                                class="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-medium"
+                                                :style="{ backgroundColor: task.status.color + '20', color: task.status.color }"
+                                            >{{ task.status.name }}</span>
+                                            <!-- Priority badge -->
+                                            <span
+                                                class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize"
+                                                :class="priorityBadge(task.priority)"
+                                            >{{ task.priority }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                         </template>
                     </template>
 
@@ -768,22 +1006,26 @@ function statusBadge(status: string) {
 
                                     <!-- Name + joined -->
                                     <div class="min-w-0 flex-1">
-                                        <p class="truncate text-[13px] font-medium text-gray-800">{{ member.name }}</p>
+                                        <div class="flex items-center gap-1.5">
+                                            <p class="truncate text-[13px] font-medium text-gray-800">{{ member.name }}</p>
+                                            <Lock v-if="member.isCreator" class="size-3 shrink-0 text-gray-400" title="Project creator — role cannot be changed" />
+                                        </div>
                                         <p v-if="member.joinedAt" class="text-[11px] text-gray-400">Joined {{ member.joinedAt }}</p>
                                     </div>
 
-                                    <!-- Role select -->
+                                    <!-- Role select (disabled for creator or non-PM) -->
                                     <select
                                         :value="member.role"
-                                        :disabled="updatingMemberId === member.id"
-                                        class="h-8 rounded-lg border border-gray-200 bg-white px-2 pr-7 text-[12px] text-gray-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 cursor-pointer disabled:opacity-50"
+                                        :disabled="updatingMemberId === member.id || member.isCreator || !isCurrentUserPM"
+                                        class="h-8 rounded-lg border border-gray-200 bg-white px-2 pr-7 text-[12px] text-gray-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                                         @change="(e) => updateMemberRole(member.id, (e.target as HTMLSelectElement).value)"
                                     >
                                         <option v-for="(label, val) in ROLE_LABELS" :key="val" :value="val">{{ label }}</option>
                                     </select>
 
-                                    <!-- Remove button -->
+                                    <!-- Remove button (PM only, hidden for creator) -->
                                     <button
+                                        v-if="isCurrentUserPM && !member.isCreator"
                                         :disabled="removingMemberId === member.id"
                                         class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
                                         :title="`Remove ${member.name}`"
@@ -791,6 +1033,8 @@ function statusBadge(status: string) {
                                     >
                                         <Trash2 class="size-4" />
                                     </button>
+                                    <!-- Spacer to maintain alignment when no remove button -->
+                                    <div v-else class="h-8 w-8 shrink-0" />
                                 </div>
                             </div>
                         </div>
@@ -802,8 +1046,8 @@ function statusBadge(status: string) {
                             <p class="mt-0.5 text-[12px] text-gray-400">Add members from your workspace below.</p>
                         </div>
 
-                        <!-- Add member section -->
-                        <div class="rounded-xl border border-gray-200 bg-white p-4">
+                        <!-- Add member section (PM only) -->
+                        <div v-if="isCurrentUserPM" class="rounded-xl border border-gray-200 bg-white p-4">
                             <p class="mb-3 flex items-center gap-1.5 text-[13px] font-semibold text-gray-800">
                                 <UserPlus class="size-3.5 text-blue-600" /> Add Member
                             </p>
@@ -813,28 +1057,25 @@ function statusBadge(status: string) {
                             </div>
 
                             <template v-else>
-                                <div class="mb-3 flex flex-col gap-3 sm:flex-row">
-                                    <!-- User select -->
-                                    <select
-                                        v-model="addMemberForm.user_id"
-                                        class="h-10 flex-1 rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 cursor-pointer"
-                                    >
-                                        <option value="">Select a member…</option>
-                                        <option v-for="u in availableUsers" :key="u.id" :value="u.id">
-                                            {{ u.name }}{{ u.job_title ? ` — ${u.job_title}` : '' }}
-                                        </option>
-                                    </select>
+                                <div class="mb-3 flex flex-col gap-3">
+                                    <!-- Member search (TomSelect) -->
+                                    <div>
+                                        <TomSelectInput
+                                            v-model="addMemberForm.user_id"
+                                            :options="availableMemberOptions"
+                                            placeholder="Search member..."
+                                        />
+                                        <InputError :message="addMemberForm.errors.user_id" class="mt-1" />
+                                    </div>
 
-                                    <!-- Role select -->
+                                    <!-- Role select (no Project Manager option) -->
                                     <select
                                         v-model="addMemberForm.role"
-                                        class="h-10 rounded-lg border border-gray-200 bg-white px-3 pr-8 text-[13px] text-gray-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+                                        class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 pr-8 text-[13px] text-gray-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 cursor-pointer"
                                     >
-                                        <option v-for="(label, val) in ROLE_LABELS" :key="val" :value="val">{{ label }}</option>
+                                        <option v-for="(label, val) in ROLE_LABELS_NO_PM" :key="val" :value="val">{{ label }}</option>
                                     </select>
                                 </div>
-
-                                <InputError :message="addMemberForm.errors.user_id" class="mb-2" />
 
                                 <button
                                     :disabled="!addMemberForm.user_id || addMemberForm.processing"
@@ -855,6 +1096,116 @@ function statusBadge(status: string) {
                     <button :disabled="editForm.processing" class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60" @click="submitEdit">
                         Save Changes
                     </button>
+                </div>
+            </div>
+        </Transition>
+    </Teleport>
+
+    <!-- ════ TAMBAH TASK MODAL ════ -->
+    <Teleport to="body">
+        <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="opacity-0 scale-95"
+            enter-to-class="opacity-100 scale-100"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="opacity-100 scale-100"
+            leave-to-class="opacity-0 scale-95"
+        >
+            <div
+                v-if="showTaskModal"
+                class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+                @click.self="showTaskModal = false"
+            >
+                <div class="w-full max-w-md rounded-2xl bg-white shadow-xl">
+                    <!-- Header -->
+                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+                        <h2 class="text-[15px] font-semibold text-gray-900">
+                            Tambah Task
+                            <span v-if="selectedProject" class="font-normal text-gray-400"> — {{ selectedProject.name }}</span>
+                        </h2>
+                        <button class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600" @click="showTaskModal = false">
+                            <X class="size-5" />
+                        </button>
+                    </div>
+
+                    <!-- Form body -->
+                    <div class="px-6 py-5 space-y-4">
+                        <!-- Title -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[13px] font-semibold text-gray-700">Judul Task <span class="text-red-500">*</span></label>
+                            <input
+                                v-model="taskForm.title"
+                                type="text"
+                                placeholder="Masukkan judul task..."
+                                class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                            />
+                            <InputError :message="taskForm.errors.title" />
+                        </div>
+
+                        <!-- Assignee -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[13px] font-semibold text-gray-700">Assign to <span class="text-red-500">*</span></label>
+                            <TomSelectInput
+                                v-model="taskForm.assigned_to"
+                                :options="memberTaskOptions"
+                                placeholder="Pilih member..."
+                            />
+                            <InputError :message="taskForm.errors.assigned_to" />
+                        </div>
+
+                        <!-- Priority + Status -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-[13px] font-semibold text-gray-700">Priority</label>
+                                <select
+                                    v-model="taskForm.priority"
+                                    class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+                                >
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                    <option value="critical">Critical</option>
+                                </select>
+                            </div>
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-[13px] font-semibold text-gray-700">Status <span class="text-red-500">*</span></label>
+                                <select
+                                    v-model="taskForm.task_status_id"
+                                    class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 cursor-pointer"
+                                >
+                                    <option value="">Pilih status...</option>
+                                    <option v-for="s in taskStatuses" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                </select>
+                                <InputError :message="taskForm.errors.task_status_id" />
+                            </div>
+                        </div>
+
+                        <!-- Deadline -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[13px] font-semibold text-gray-700">Deadline</label>
+                            <input
+                                v-model="taskForm.deadline"
+                                type="date"
+                                class="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+                        <button
+                            type="button"
+                            class="rounded-lg border border-gray-200 px-4 py-2 text-[13px] font-medium text-gray-600 transition hover:bg-gray-50"
+                            @click="showTaskModal = false"
+                        >Cancel</button>
+                        <button
+                            :disabled="!taskForm.title || !taskForm.assigned_to || !taskForm.task_status_id || taskForm.processing"
+                            class="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            @click="submitTask"
+                        >
+                            <Plus class="size-4" /> Tambah Task
+                        </button>
+                    </div>
                 </div>
             </div>
         </Transition>
