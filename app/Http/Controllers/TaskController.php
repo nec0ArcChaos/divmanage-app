@@ -50,7 +50,9 @@ class TaskController extends Controller
                         'id'   => $task->assignee->id,
                         'name' => $task->assignee->name,
                     ] : null,
-                    'updated_at'        => $task->updated_at->format('Y-m-d H:i:s'),
+                    'updated_at'           => $task->updated_at->format('Y-m-d H:i:s'),
+                    'completed_at'         => $task->completed_at?->format('Y-m-d'),
+                    'completedAtFormatted' => $task->completed_at?->format('M d, Y'),
                 ];
             })
             ->values()
@@ -84,6 +86,8 @@ class TaskController extends Controller
             ->where('workspace_id', $user->workspace_id)
             ->firstOrFail();
 
+        $status = TaskStatus::find($validated['task_status_id']);
+
         Task::create([
             'project_id'     => $validated['project_id'],
             'task_status_id' => $validated['task_status_id'],
@@ -93,6 +97,7 @@ class TaskController extends Controller
             'assigned_to'    => $user->id,
             'created_by'     => $user->id,
             'deadline'       => $validated['deadline'] ?: null,
+            'completed_at'   => $status->is_done ? now() : null,
         ]);
 
         return redirect()->route('tasks.index');
@@ -106,14 +111,23 @@ class TaskController extends Controller
             ->where('workspace_id', Auth::user()->workspace_id)
             ->firstOrFail();
 
-        $task->update([
+        $newStatus  = TaskStatus::find($validated['task_status_id']);
+        $updateData = [
             'project_id'     => $validated['project_id'],
             'task_status_id' => $validated['task_status_id'],
             'title'          => $validated['title'],
             'description'    => $validated['description'] ?? null,
             'priority'       => $validated['priority'],
             'deadline'       => $validated['deadline'] ?: null,
-        ]);
+        ];
+
+        if ($newStatus->is_done && ! $task->completed_at) {
+            $updateData['completed_at'] = now();
+        } elseif (! $newStatus->is_done) {
+            $updateData['completed_at'] = null;
+        }
+
+        $task->update($updateData);
 
         return redirect()->route('tasks.index');
     }
@@ -139,7 +153,16 @@ class TaskController extends Controller
             'task_status_id' => ['required', 'integer', 'exists:task_statuses,id'],
         ]);
 
-        $task->update(['task_status_id' => $validated['task_status_id']]);
+        $newStatus  = TaskStatus::find($validated['task_status_id']);
+        $updateData = ['task_status_id' => $validated['task_status_id']];
+
+        if ($newStatus->is_done && ! $task->completed_at) {
+            $updateData['completed_at'] = now();
+        } elseif (! $newStatus->is_done) {
+            $updateData['completed_at'] = null;
+        }
+
+        $task->update($updateData);
 
         return redirect()->route('tasks.index');
     }

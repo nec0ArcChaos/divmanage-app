@@ -7,6 +7,7 @@ import {
     CheckCircle2,
     ChevronDown,
     ClipboardList,
+    Clock,
     Edit2,
     Plus,
     RefreshCw,
@@ -50,6 +51,8 @@ interface TaskItem {
     priority: Priority;
     deadline: string | null;
     deadlineFormatted: string | null;
+    completed_at: string | null;
+    completedAtFormatted: string | null;
     project_id: number;
     task_status_id: number;
     project: ProjectOption;
@@ -190,6 +193,13 @@ function priorityBadgeClass(priority: Priority): string {
 
 function isOverdue(deadline: string | null): boolean {
     return deadline !== null && deadline < props.today;
+}
+
+function isCompletedLate(task: TaskItem): boolean {
+    return task.status.is_done
+        && task.deadline !== null
+        && task.completed_at !== null
+        && task.completed_at > task.deadline;
 }
 
 function capitalize(s: string): string {
@@ -481,8 +491,26 @@ function deleteTask(task: TaskItem) {
 
                         <!-- Deadline -->
                         <td class="px-5 py-3.5">
+                            <!-- Done + Terlambat: amber -->
+                            <div v-if="isCompletedLate(task)" class="flex items-center gap-1">
+                                <Clock class="size-3.5 shrink-0 text-amber-500" />
+                                <div>
+                                    <span class="whitespace-nowrap text-sm font-semibold text-amber-600">
+                                        {{ task.completedAtFormatted ?? '—' }}
+                                    </span>
+                                    <p class="text-[10px] font-medium text-amber-500">Terlambat</p>
+                                </div>
+                            </div>
+                            <!-- Done + Tepat Waktu: emerald -->
+                            <div v-else-if="task.status.is_done" class="flex items-center gap-1">
+                                <CheckCircle2 class="size-3.5 shrink-0 text-emerald-500" />
+                                <span class="whitespace-nowrap text-sm font-semibold text-emerald-600">
+                                    {{ task.completedAtFormatted ?? '—' }}
+                                </span>
+                            </div>
+                            <!-- Not done: logika existing (merah jika overdue) -->
                             <span
-                                v-if="task.deadlineFormatted"
+                                v-else-if="task.deadlineFormatted"
                                 :class="[
                                     'whitespace-nowrap text-sm',
                                     isOverdue(task.deadline) ? 'font-semibold text-red-600' : 'text-gray-500',
@@ -802,10 +830,46 @@ function deleteTask(task: TaskItem) {
                                     </div>
                                 </div>
 
-                                <!-- Deadline -->
+                                <!-- Deadline / Completed -->
                                 <div>
-                                    <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Deadline</p>
+                                    <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                        {{ viewingTask.status.is_done ? 'Completed' : 'Deadline' }}
+                                    </p>
+                                    <!-- Done state: tanggal selesai -->
+                                    <div v-if="viewingTask.status.is_done">
+                                        <!-- Terlambat -->
+                                        <div v-if="isCompletedLate(viewingTask)" class="flex items-center gap-1.5">
+                                            <Clock class="size-3.5 text-amber-500" />
+                                            <p class="text-sm font-medium text-amber-600">
+                                                {{ viewingTask.completedAtFormatted ?? '—' }}
+                                            </p>
+                                        </div>
+                                        <!-- Tepat Waktu -->
+                                        <div v-else class="flex items-center gap-1.5">
+                                            <CheckCircle2 class="size-3.5 text-emerald-500" />
+                                            <p class="text-sm font-medium text-emerald-600">
+                                                {{ viewingTask.completedAtFormatted ?? '—' }}
+                                            </p>
+                                        </div>
+                                        <!-- Badge status penyelesaian -->
+                                        <span
+                                            v-if="isCompletedLate(viewingTask)"
+                                            class="mt-1.5 inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200"
+                                        >
+                                            <Clock class="size-2.5" />
+                                            Diselesaikan Terlambat
+                                        </span>
+                                        <span
+                                            v-else-if="viewingTask.deadline"
+                                            class="mt-1.5 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200"
+                                        >
+                                            <Check class="size-2.5" />
+                                            Tepat Waktu
+                                        </span>
+                                    </div>
+                                    <!-- Non-done state: logika existing -->
                                     <p
+                                        v-else
                                         :class="[
                                             'text-sm font-medium',
                                             viewingTask.deadline && isOverdue(viewingTask.deadline)
