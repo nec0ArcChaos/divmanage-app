@@ -3,7 +3,9 @@ import { computed, ref } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import {
     AlertTriangle,
+    Check,
     CheckCircle2,
+    ChevronDown,
     ClipboardList,
     Edit2,
     Plus,
@@ -14,6 +16,8 @@ import {
 } from 'lucide-vue-next';
 import DashboardLayout from '@/layouts/DashboardLayout.vue';
 import InputError from '@/components/InputError.vue';
+import TomSelectInput from '@/components/TomSelectInput.vue';
+import { getInitials } from '@/composables/useInitials';
 
 defineOptions({ layout: DashboardLayout });
 
@@ -34,6 +38,11 @@ interface ProjectOption {
     color: string;
 }
 
+interface Assignee {
+    id: number;
+    name: string;
+}
+
 interface TaskItem {
     id: number;
     title: string;
@@ -45,6 +54,7 @@ interface TaskItem {
     task_status_id: number;
     project: ProjectOption;
     status: TaskStatusItem;
+    assignee: Assignee | null;
     updated_at: string;
 }
 
@@ -186,6 +196,18 @@ function capitalize(s: string): string {
     return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// ── Inline status dropdown ──────────────────────────────────────────────────
+const openStatusDropdownId = ref<number | null>(null);
+
+function updateTaskStatus(task: TaskItem, status: TaskStatusItem) {
+    openStatusDropdownId.value = null;
+    router.patch(
+        `/tasks/${task.id}/status`,
+        { task_status_id: status.id },
+        { preserveScroll: true },
+    );
+}
+
 // ── Modal state ─────────────────────────────────────────────────────────────
 const showTaskModal   = ref(false);
 const showDetailModal = ref(false);
@@ -200,6 +222,10 @@ const taskForm = useForm({
     task_status_id: '' as number | '',
     deadline:       '',
 });
+
+const projectOptions = computed(() =>
+    props.projects.map(p => ({ value: p.id, label: p.name })),
+);
 
 function openCreateModal() {
     editingTask.value = null;
@@ -255,14 +281,21 @@ function deleteTask(task: TaskItem) {
 <template>
     <Head title="My Tasks" />
 
+    <!-- Transparent backdrop — closes status dropdown on outside click -->
+    <div
+        v-if="openStatusDropdownId !== null"
+        class="fixed inset-0 z-10"
+        @click="openStatusDropdownId = null"
+    />
+
     <!-- ── Page header ───────────────────────────────────────────────────── -->
-    <div class="mb-7 flex items-end justify-between gap-4 flex-wrap">
+    <div class="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div>
             <h1 class="text-2xl font-bold tracking-tight text-gray-900">My Tasks</h1>
             <p class="mt-1 text-sm text-gray-500">All tasks assigned to you across projects</p>
         </div>
         <button
-            class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-95 transition-all"
+            class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-95"
             @click="openCreateModal"
         >
             <Plus class="size-4" />
@@ -408,16 +441,42 @@ function deleteTask(task: TaskItem) {
                             </span>
                         </td>
 
-                        <!-- Status -->
+                        <!-- Status — inline dropdown -->
                         <td class="px-5 py-3.5">
-                            <span
-                                :class="[
-                                    'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold',
-                                    statusBadgeClass(task.status.slug),
-                                ]"
-                            >
-                                {{ task.status.name }}
-                            </span>
+                            <div class="relative inline-block">
+                                <!-- Clickable status badge -->
+                                <button
+                                    :class="[
+                                        'inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold transition',
+                                        statusBadgeClass(task.status.slug),
+                                    ]"
+                                    @click.stop="openStatusDropdownId = openStatusDropdownId === task.id ? null : task.id"
+                                >
+                                    {{ task.status.name }}
+                                    <ChevronDown class="size-3 opacity-60" />
+                                </button>
+
+                                <!-- Status options dropdown -->
+                                <div
+                                    v-if="openStatusDropdownId === task.id"
+                                    class="absolute left-0 top-full z-20 mt-1 min-w-[160px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+                                >
+                                    <button
+                                        v-for="s in taskStatuses"
+                                        :key="s.id"
+                                        class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-gray-700 transition hover:bg-gray-50"
+                                        :class="{ 'bg-blue-50 font-semibold text-blue-700': s.id === task.task_status_id }"
+                                        @click.stop="updateTaskStatus(task, s)"
+                                    >
+                                        <span class="h-2 w-2 shrink-0 rounded-full" :style="{ background: s.color }" />
+                                        {{ s.name }}
+                                        <Check
+                                            v-if="s.id === task.task_status_id"
+                                            class="ml-auto size-3 text-blue-600"
+                                        />
+                                    </button>
+                                </div>
+                            </div>
                         </td>
 
                         <!-- Deadline -->
@@ -482,7 +541,9 @@ function deleteTask(task: TaskItem) {
                 <AlertTriangle class="size-4" />
             </span>
             <span class="text-sm font-semibold text-red-800">Overdue Tasks</span>
-            <span class="text-xs text-red-600">— {{ overdueTasks.length }} task{{ overdueTasks.length > 1 ? 's' : '' }} need attention</span>
+            <span class="text-xs text-red-600">
+                — {{ overdueTasks.length }} task{{ overdueTasks.length > 1 ? 's' : '' }} need attention
+            </span>
         </div>
         <div
             v-for="task in overdueTasks"
@@ -541,7 +602,7 @@ function deleteTask(task: TaskItem) {
                         </div>
 
                         <!-- Form -->
-                        <form @submit.prevent="submitTaskForm" class="px-6 py-5 space-y-4">
+                        <form class="space-y-4 px-6 py-5" @submit.prevent="submitTaskForm">
                             <!-- Title -->
                             <div>
                                 <label class="mb-1.5 block text-sm font-medium text-gray-700">
@@ -587,15 +648,17 @@ function deleteTask(task: TaskItem) {
                                 </div>
                                 <div>
                                     <label class="mb-1.5 block text-sm font-medium text-gray-700">
-                                        Project <span class="text-red-500">*</span>
+                                        Project
+                                        <span v-if="!editingTask" class="text-red-500">*</span>
+                                        <span v-else class="ml-1 text-xs font-normal text-gray-400">(cannot change)</span>
                                     </label>
-                                    <select
+                                    <!-- Tom Select — searchable, disabled when editing -->
+                                    <TomSelectInput
                                         v-model="taskForm.project_id"
-                                        class="h-9 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-700 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-50"
-                                    >
-                                        <option value="">Select project</option>
-                                        <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
-                                    </select>
+                                        :options="projectOptions"
+                                        placeholder="Select project..."
+                                        :disabled="!!editingTask"
+                                    />
                                     <InputError :message="taskForm.errors.project_id" class="mt-1" />
                                 </div>
                             </div>
@@ -718,15 +781,16 @@ function deleteTask(task: TaskItem) {
                         </div>
 
                         <!-- Body -->
-                        <div class="px-6 py-5 space-y-4">
+                        <div class="space-y-4 px-6 py-5">
                             <!-- Description -->
                             <div v-if="viewingTask.description">
                                 <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Description</p>
-                                <p class="text-sm text-gray-700 leading-relaxed">{{ viewingTask.description }}</p>
+                                <p class="leading-relaxed text-sm text-gray-700">{{ viewingTask.description }}</p>
                             </div>
 
                             <!-- Details grid -->
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-4">
+                                <!-- Project -->
                                 <div>
                                     <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Project</p>
                                     <div class="flex items-center gap-2">
@@ -737,6 +801,8 @@ function deleteTask(task: TaskItem) {
                                         <span class="text-sm text-gray-700">{{ viewingTask.project.name }}</span>
                                     </div>
                                 </div>
+
+                                <!-- Deadline -->
                                 <div>
                                     <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Deadline</p>
                                     <p
@@ -753,6 +819,17 @@ function deleteTask(task: TaskItem) {
                                             class="ml-1 text-xs font-normal text-red-500"
                                         >(overdue)</span>
                                     </p>
+                                </div>
+
+                                <!-- Assignee -->
+                                <div>
+                                    <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Assignee</p>
+                                    <div class="flex items-center gap-2">
+                                        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700">
+                                            {{ getInitials(viewingTask.assignee?.name) }}
+                                        </span>
+                                        <span class="text-sm text-gray-700">{{ viewingTask.assignee?.name ?? '—' }}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

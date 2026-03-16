@@ -7,6 +7,8 @@ use App\Http\Requests\TaskUpdateRequest;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskStatus;
+use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
@@ -18,7 +20,7 @@ class TaskController extends Controller
         $workspaceId = $user->workspace_id;
 
         $tasks = Task::where('assigned_to', $user->id)
-            ->with(['project', 'status'])
+            ->with(['project', 'status', 'assignee'])
             ->orderByRaw('CASE WHEN deadline IS NULL THEN 1 ELSE 0 END')
             ->orderBy('deadline')
             ->get()
@@ -44,6 +46,10 @@ class TaskController extends Controller
                         'color'   => $task->status->color,
                         'is_done' => $task->status->is_done,
                     ],
+                    'assignee'          => $task->assignee ? [
+                        'id'   => $task->assignee->id,
+                        'name' => $task->assignee->name,
+                    ] : null,
                     'updated_at'        => $task->updated_at->format('Y-m-d H:i:s'),
                 ];
             })
@@ -119,6 +125,21 @@ class TaskController extends Controller
         }
 
         $task->delete();
+
+        return redirect()->route('tasks.index');
+    }
+
+    public function updateStatus(Request $request, Task $task): RedirectResponse
+    {
+        if ($task->assigned_to !== Auth::id()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'task_status_id' => ['required', 'integer', 'exists:task_statuses,id'],
+        ]);
+
+        $task->update(['task_status_id' => $validated['task_status_id']]);
 
         return redirect()->route('tasks.index');
     }
