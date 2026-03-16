@@ -41,7 +41,75 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Create a workspace and a user assigned to it.
+ *
+ * @return array{0: \App\Models\User, 1: \App\Models\Workspace}
+ */
+function createWorkspaceUser(array $userAttrs = []): array
 {
-    // ..
+    $owner = \App\Models\User::factory()->create();
+
+    $workspace = \App\Models\Workspace::create([
+        'name'        => 'Test Workspace',
+        'slug'        => 'ws-' . uniqid(),
+        'timezone'    => 'Asia/Jakarta',
+        'date_format' => 'DD/MM/YYYY',
+        'owner_id'    => $owner->id,
+    ]);
+
+    $user = \App\Models\User::factory()->create(array_merge(
+        ['workspace_id' => $workspace->id],
+        $userAttrs,
+    ));
+
+    return [$user, $workspace];
+}
+
+/**
+ * Create a project inside the given workspace.
+ * Any Project fillable attribute can be overridden via $attrs.
+ */
+function createProject(\App\Models\Workspace $workspace, \App\Models\User $creator, array $attrs = []): \App\Models\Project
+{
+    $name = $attrs['name'] ?? ('Project ' . uniqid());
+
+    return \App\Models\Project::create(array_merge([
+        'workspace_id' => $workspace->id,
+        'name'         => $name,
+        'slug'         => \Illuminate\Support\Str::slug($name) . '-' . uniqid(),
+        'color'        => '#3b6ff8',
+        'status'       => 'active',
+        'progress'     => 0,
+        'created_by'   => $creator->id,
+    ], $attrs));
+}
+
+/**
+ * Add a user to a project as a member with the given role.
+ */
+function addProjectMember(\App\Models\Project $project, \App\Models\User $user, string $role = 'developer'): \App\Models\ProjectMember
+{
+    return \App\Models\ProjectMember::create([
+        'project_id' => $project->id,
+        'user_id'    => $user->id,
+        'role'       => $role,
+        'joined_at'  => now(),
+    ]);
+}
+
+/**
+ * Returns a minimal valid payload for creating or updating a project.
+ */
+function validProjectPayload(array $overrides = []): array
+{
+    return array_merge([
+        'name'        => 'New Test Project',
+        'description' => 'A test project description.',
+        'status'      => 'planning',
+        'color'       => '#3b6ff8',
+        'start_date'  => '2026-01-01',
+        'deadline'    => '2026-12-31',
+        'progress'    => 0,
+    ], $overrides);
 }
