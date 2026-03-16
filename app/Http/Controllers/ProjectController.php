@@ -5,11 +5,15 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ProjectStoreRequest;
 use App\Http\Requests\ProjectUpdateRequest;
 use App\Models\Project;
+use App\Models\ProjectMember;
+use App\Models\Task;
+use App\Models\TaskStatus;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class ProjectController extends Controller
@@ -20,7 +24,7 @@ class ProjectController extends Controller
         $workspaceId = $user->workspace_id;
 
         $query = Project::where('workspace_id', $workspaceId)
-            ->with(['projectMembers.user', 'tasks.status', 'tasks.assignee']);
+            ->with(['projectMembers.user', 'tasks.status', 'tasks.assignee', 'tasks.creator']);
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -49,11 +53,12 @@ class ProjectController extends Controller
             $managerPm = $project->projectMembers->first(fn ($pm) => $pm->role === 'project_manager');
 
             $members = $project->projectMembers->map(fn ($pm) => [
-                'id'       => $pm->user->id,
-                'name'     => $pm->user->name,
-                'initials' => $this->initials($pm->user->name),
-                'role'     => $pm->role,
-                'joinedAt' => $pm->joined_at?->format('M d, Y'),
+                'id'        => $pm->user->id,
+                'name'      => $pm->user->name,
+                'initials'  => $this->initials($pm->user->name),
+                'role'      => $pm->role,
+                'joinedAt'  => $pm->joined_at?->format('M d, Y'),
+                'isCreator' => $pm->user_id === $project->created_by,
             ])->values()->toArray();
 
             // Auto-calculate progress from done tasks
@@ -84,11 +89,13 @@ class ProjectController extends Controller
                         'name'     => $user?->name ?? 'Unassigned',
                         'initials' => $user ? $this->initials($user->name) : '??',
                         'tasks'    => $tasks->map(fn ($t) => [
-                            'id'       => $t->id,
-                            'title'    => $t->title,
-                            'priority' => $t->priority,
-                            'deadline' => $t->deadline?->format('M d, Y'),
-                            'status'   => $t->status ? [
+                            'id'          => $t->id,
+                            'title'       => $t->title,
+                            'priority'    => $t->priority,
+                            'deadline'    => $t->deadline?->format('M d, Y'),
+                            'assignorName' => $t->creator?->name ?? 'Unknown',
+                            'assignedAt'   => $t->created_at?->format('M d, Y'),
+                            'status'      => $t->status ? [
                                 'name'    => $t->status->name,
                                 'color'   => $t->status->color,
                                 'is_done' => $t->status->is_done,
@@ -108,6 +115,7 @@ class ProjectController extends Controller
                 'status'            => $project->status,
                 'progress'          => $progress,
                 'doneCount'         => $doneTasks,
+                'createdBy'         => $project->created_by,
                 'start_date'        => $project->start_date?->format('Y-m-d'),
                 'deadline'          => $project->deadline?->format('Y-m-d'),
                 'deadlineFormatted' => $project->deadline?->format('M d, Y'),
@@ -139,6 +147,11 @@ class ProjectController extends Controller
             ])
             ->toArray();
 
+        $taskStatuses = TaskStatus::where('workspace_id', $workspaceId)
+            ->orderBy('position')
+            ->get(['id', 'name', 'color', 'is_done'])
+            ->toArray();
+
         return Inertia::render('Projects', [
             'projects'       => $projects,
             'stats'          => $this->getStats($workspaceId),
@@ -148,6 +161,7 @@ class ProjectController extends Controller
                 'sort'   => $sort,
             ],
             'workspaceUsers' => $workspaceUsers,
+            'taskStatuses'   => $taskStatuses,
         ]);
     }
 
@@ -157,7 +171,7 @@ class ProjectController extends Controller
         $workspaceId = $user->workspace_id;
         $validated   = $request->validated();
 
-        Project::create([
+        $project = Project::create([
             'workspace_id' => $workspaceId,
             'name'         => $validated['name'],
             'slug'         => $this->generateSlug($validated['name'], $workspaceId),
@@ -169,11 +183,21 @@ class ProjectController extends Controller
             'created_by'   => $user->id,
         ]);
 
+        // Auto-add creator as project manager
+        ProjectMember::create([
+            'project_id' => $project->id,
+            'user_id'    => $user->id,
+            'role'       => 'project_manager',
+            'joined_at'  => now(),
+        ]);
+
         return redirect()->route('projects.index');
     }
 
     public function update(ProjectUpdateRequest $request, Project $project)
     {
+        $this->requireProjectManager($project);
+
         $validated = $request->validated();
 
         $slug = $project->slug;
@@ -192,6 +216,49 @@ class ProjectController extends Controller
         ]);
 
         return redirect()->route('projects.index');
+    }
+
+    public function storeTask(Request $request, Project $project)
+    {
+        $this->requireProjectManager($project);
+
+        $validated = $request->validate([
+            'title'          => ['required', 'string', 'max:255'],
+            'task_status_id' => ['required', 'integer', 'exists:task_statuses,id'],
+            'priority'       => ['required', Rule::in(['low', 'medium', 'high', 'critical'])],
+            'assigned_to'    => ['required', 'integer', 'exists:users,id'],
+            'deadline'       => ['nullable', 'date'],
+        ]);
+
+        // Ensure assignee is a project member
+        if (! $project->projectMembers()->where('user_id', $validated['assigned_to'])->exists()) {
+            return back()->withErrors(['assigned_to' => 'User must be a member of this project.']);
+        }
+
+        $status = TaskStatus::find($validated['task_status_id']);
+
+        Task::create([
+            'project_id'     => $project->id,
+            'task_status_id' => $validated['task_status_id'],
+            'title'          => $validated['title'],
+            'priority'       => $validated['priority'],
+            'assigned_to'    => $validated['assigned_to'],
+            'created_by'     => Auth::id(),
+            'deadline'       => $validated['deadline'] ?: null,
+            'completed_at'   => $status->is_done ? now() : null,
+        ]);
+
+        return redirect()->route('projects.index');
+    }
+
+    private function requireProjectManager(Project $project): void
+    {
+        if (! $project->projectMembers()
+            ->where('user_id', Auth::id())
+            ->where('role', 'project_manager')
+            ->exists()) {
+            abort(403);
+        }
     }
 
     private function generateSlug(string $name, int $workspaceId, ?int $excludeId = null): string

@@ -59,6 +59,9 @@ interface TaskItem {
     status: TaskStatusItem;
     assignee: Assignee | null;
     updated_at: string;
+    canDelete: boolean;
+    createdByName: string | null;
+    assignedAt: string | null;
 }
 
 interface TaskStats {
@@ -538,6 +541,7 @@ function deleteTask(task: TaskItem) {
                                     <Edit2 class="size-3.5" />
                                 </button>
                                 <button
+                                    v-if="task.canDelete"
                                     class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500"
                                     title="Delete task"
                                     @click="deleteTask(task)"
@@ -893,6 +897,20 @@ function deleteTask(task: TaskItem) {
                                             {{ getInitials(viewingTask.assignee?.name) }}
                                         </span>
                                         <span class="text-sm text-gray-700">{{ viewingTask.assignee?.name ?? '—' }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Assigned by -->
+                                <div v-if="viewingTask.createdByName">
+                                    <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Assigned by</p>
+                                    <div class="flex items-center gap-2">
+                                        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-[10px] font-bold text-gray-600">
+                                            {{ getInitials(viewingTask.createdByName) }}
+                                        </span>
+                                        <div>
+                                            <span class="text-sm text-gray-700">{{ viewingTask.createdByName }}</span>
+                                            <p v-if="viewingTask.assignedAt" class="text-[11px] text-gray-400">{{ viewingTask.assignedAt }}</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

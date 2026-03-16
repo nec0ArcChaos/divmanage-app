@@ -20,11 +20,11 @@ class TaskController extends Controller
         $workspaceId = $user->workspace_id;
 
         $tasks = Task::where('assigned_to', $user->id)
-            ->with(['project', 'status', 'assignee'])
+            ->with(['project', 'status', 'assignee', 'creator'])
             ->orderByRaw('CASE WHEN deadline IS NULL THEN 1 ELSE 0 END')
             ->orderBy('deadline')
             ->get()
-            ->map(function (Task $task) {
+            ->map(function (Task $task) use ($user) {
                 return [
                     'id'                => $task->id,
                     'title'             => $task->title,
@@ -53,6 +53,9 @@ class TaskController extends Controller
                     'updated_at'           => $task->updated_at->format('Y-m-d H:i:s'),
                     'completed_at'         => $task->completed_at?->format('Y-m-d'),
                     'completedAtFormatted' => $task->completed_at?->format('M d, Y'),
+                    'canDelete'            => $task->created_by === $user->id,
+                    'createdByName'        => $task->creator?->name ?? null,
+                    'assignedAt'           => $task->created_at?->format('M d, Y'),
                 ];
             })
             ->values()
@@ -134,7 +137,7 @@ class TaskController extends Controller
 
     public function destroy(Task $task)
     {
-        if ($task->assigned_to !== Auth::id()) {
+        if ($task->created_by !== Auth::id()) {
             abort(403);
         }
 

@@ -18,6 +18,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('projects/{project}/members', [ProjectMemberController::class, 'store'])->name('project-members.store');
     Route::put('projects/{project}/members/{user}', [ProjectMemberController::class, 'update'])->name('project-members.update');
     Route::delete('projects/{project}/members/{user}', [ProjectMemberController::class, 'destroy'])->name('project-members.destroy');
+    Route::post('projects/{project}/tasks', [ProjectController::class, 'storeTask'])->name('project-tasks.store');
 
     Route::get('my-tasks', [TaskController::class, 'index'])->name('tasks.index');
     Route::post('tasks', [TaskController::class, 'store'])->name('tasks.store');
