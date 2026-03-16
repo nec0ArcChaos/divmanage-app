@@ -210,10 +210,28 @@ function capitalize(s: string): string {
 }
 
 // ── Inline status dropdown ──────────────────────────────────────────────────
-const openStatusDropdownId = ref<number | null>(null);
+const openStatusDropdownId   = ref<number | null>(null);
+const openStatusDropdownTask = ref<TaskItem | null>(null);
+const dropdownPos            = ref({ top: 0, left: 0 });
+
+function toggleStatusDropdown(event: MouseEvent, task: TaskItem) {
+    if (openStatusDropdownId.value === task.id) {
+        openStatusDropdownId.value   = null;
+        openStatusDropdownTask.value = null;
+        return;
+    }
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    dropdownPos.value = {
+        top:  rect.bottom + 4,
+        left: rect.left,
+    };
+    openStatusDropdownId.value   = task.id;
+    openStatusDropdownTask.value = task;
+}
 
 function updateTaskStatus(task: TaskItem, status: TaskStatusItem) {
-    openStatusDropdownId.value = null;
+    openStatusDropdownId.value   = null;
+    openStatusDropdownTask.value = null;
     router.patch(
         `/tasks/${task.id}/status`,
         { task_status_id: status.id },
@@ -297,9 +315,33 @@ function deleteTask(task: TaskItem) {
     <!-- Transparent backdrop — closes status dropdown on outside click -->
     <div
         v-if="openStatusDropdownId !== null"
-        class="fixed inset-0 z-10"
-        @click="openStatusDropdownId = null"
+        class="fixed inset-0 z-[19]"
+        @click="openStatusDropdownId = null; openStatusDropdownTask = null"
     />
+
+    <!-- Teleported status dropdown — fixed position, escapes overflow clipping -->
+    <Teleport to="body">
+        <div
+            v-if="openStatusDropdownTask"
+            :style="{ position: 'fixed', top: dropdownPos.top + 'px', left: dropdownPos.left + 'px' }"
+            class="z-[20] min-w-[160px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+        >
+            <button
+                v-for="s in taskStatuses"
+                :key="s.id"
+                class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-gray-700 transition hover:bg-gray-50"
+                :class="{ 'bg-blue-50 font-semibold text-blue-700': s.id === openStatusDropdownTask.task_status_id }"
+                @click.stop="updateTaskStatus(openStatusDropdownTask!, s)"
+            >
+                <span class="h-2 w-2 shrink-0 rounded-full" :style="{ background: s.color }" />
+                {{ s.name }}
+                <Check
+                    v-if="s.id === openStatusDropdownTask.task_status_id"
+                    class="ml-auto size-3 text-blue-600"
+                />
+            </button>
+        </div>
+    </Teleport>
 
     <!-- ── Page header ───────────────────────────────────────────────────── -->
     <div class="mb-7 flex flex-wrap items-end justify-between gap-4">
@@ -456,40 +498,16 @@ function deleteTask(task: TaskItem) {
 
                         <!-- Status — inline dropdown -->
                         <td class="px-5 py-3.5">
-                            <div class="relative inline-block">
-                                <!-- Clickable status badge -->
-                                <button
-                                    :class="[
-                                        'inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold transition',
-                                        statusBadgeClass(task.status.slug),
-                                    ]"
-                                    @click.stop="openStatusDropdownId = openStatusDropdownId === task.id ? null : task.id"
-                                >
-                                    {{ task.status.name }}
-                                    <ChevronDown class="size-3 opacity-60" />
-                                </button>
-
-                                <!-- Status options dropdown -->
-                                <div
-                                    v-if="openStatusDropdownId === task.id"
-                                    class="absolute left-0 top-full z-20 mt-1 min-w-[160px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
-                                >
-                                    <button
-                                        v-for="s in taskStatuses"
-                                        :key="s.id"
-                                        class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-gray-700 transition hover:bg-gray-50"
-                                        :class="{ 'bg-blue-50 font-semibold text-blue-700': s.id === task.task_status_id }"
-                                        @click.stop="updateTaskStatus(task, s)"
-                                    >
-                                        <span class="h-2 w-2 shrink-0 rounded-full" :style="{ background: s.color }" />
-                                        {{ s.name }}
-                                        <Check
-                                            v-if="s.id === task.task_status_id"
-                                            class="ml-auto size-3 text-blue-600"
-                                        />
-                                    </button>
-                                </div>
-                            </div>
+                            <button
+                                :class="[
+                                    'inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold transition',
+                                    statusBadgeClass(task.status.slug),
+                                ]"
+                                @click.stop="toggleStatusDropdown($event, task)"
+                            >
+                                {{ task.status.name }}
+                                <ChevronDown class="size-3 opacity-60" />
+                            </button>
                         </td>
 
                         <!-- Deadline -->
