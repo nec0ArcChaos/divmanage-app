@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import {
     Code2,
     FlaskConical,
@@ -9,8 +9,10 @@ import {
     Search,
     ShieldCheck,
     Users,
+    X,
 } from 'lucide-vue-next';
 import DashboardLayout from '@/layouts/DashboardLayout.vue';
+import InputError from '@/components/InputError.vue';
 
 defineOptions({ layout: DashboardLayout });
 
@@ -59,6 +61,13 @@ const props = defineProps<{
     activeProjects: ActiveProject[];
 }>();
 
+// ── Auth / Permissions ─────────────────────────────────────────────────────
+const page        = usePage();
+const currentUser = computed(() => (page.props.auth as any)?.user);
+const canManage   = computed(() =>
+    ['admin', 'project_manager'].includes(currentUser.value?.global_role),
+);
+
 // ── Filters ────────────────────────────────────────────────────────────────
 const searchQuery  = ref('');
 const roleFilter   = ref<'all' | GlobalRole>('all');
@@ -84,6 +93,33 @@ const filteredMembers = computed(() => {
     }
     return result;
 });
+
+// ── Add Member Modal ───────────────────────────────────────────────────────
+const showAddModal = ref(false);
+
+const addForm = useForm({
+    name:        '',
+    username:    '',
+    email:       '',
+    job_title:   '',
+    phone:       '',
+    global_role: 'developer' as GlobalRole,
+});
+
+function openAddModal() {
+    addForm.reset();
+    addForm.clearErrors();
+    showAddModal.value = true;
+}
+
+function submitAdd() {
+    addForm.post('/team', {
+        onSuccess: () => {
+            showAddModal.value = false;
+            addForm.reset();
+        },
+    });
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const roleLabel: Record<GlobalRole, string> = {
@@ -133,9 +169,9 @@ function avatarColor(id: number): string {
                 <p class="mt-1 text-sm text-gray-500">Manage and view members of the IT division</p>
             </div>
             <button
-                disabled
-                title="Coming soon"
-                class="inline-flex cursor-not-allowed items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white opacity-60 shadow-sm"
+                v-if="canManage"
+                @click="openAddModal"
+                class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
             >
                 <Plus class="size-4" />
                 Add Member
@@ -322,7 +358,10 @@ function avatarColor(id: number): string {
                                     <button class="inline-flex h-7 items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 text-[12px] font-medium text-gray-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
                                         View
                                     </button>
-                                    <button class="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
+                                    <button
+                                        v-if="canManage"
+                                        class="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                                    >
                                         <MoreHorizontal class="size-3.5" />
                                     </button>
                                 </div>
@@ -393,4 +432,176 @@ function avatarColor(id: number): string {
 
         <div class="h-8" />
     </div>
+
+    <!-- ── Add Member Modal ─────────────────────────────────────────────── -->
+    <Teleport to="body">
+        <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
+            <div
+                v-if="showAddModal"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+                @click.self="showAddModal = false"
+            >
+                <Transition
+                    enter-active-class="transition duration-200 ease-out"
+                    enter-from-class="scale-95 opacity-0"
+                    enter-to-class="scale-100 opacity-100"
+                    leave-active-class="transition duration-150 ease-in"
+                    leave-from-class="scale-100 opacity-100"
+                    leave-to-class="scale-95 opacity-0"
+                >
+                    <div v-if="showAddModal" class="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+
+                        <!-- Header -->
+                        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+                            <div>
+                                <h2 class="text-[16px] font-bold text-gray-900">Add New Member</h2>
+                                <p class="mt-0.5 text-[12.5px] text-gray-400">Member akan bisa login dengan password default</p>
+                            </div>
+                            <button
+                                @click="showAddModal = false"
+                                class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                            >
+                                <X class="size-4" />
+                            </button>
+                        </div>
+
+                        <!-- Form -->
+                        <form class="space-y-4 px-6 py-5" @submit.prevent="submitAdd">
+
+                            <!-- Nama Lengkap -->
+                            <div>
+                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
+                                    Nama Lengkap <span class="text-red-500">*</span>
+                                </label>
+                                <input
+                                    v-model="addForm.name"
+                                    type="text"
+                                    placeholder="e.g. Budi Santoso"
+                                    class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
+                                    :class="{ 'border-red-300 focus:border-red-400 focus:ring-red-50': addForm.errors.name }"
+                                />
+                                <InputError :message="addForm.errors.name" class="mt-1" />
+                            </div>
+
+                            <!-- Username + Email (2 columns) -->
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
+                                        Username <span class="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        v-model="addForm.username"
+                                        type="text"
+                                        placeholder="budi_santoso"
+                                        class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
+                                        :class="{ 'border-red-300 focus:border-red-400 focus:ring-red-50': addForm.errors.username }"
+                                    />
+                                    <InputError :message="addForm.errors.username" class="mt-1" />
+                                </div>
+                                <div>
+                                    <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
+                                        Role <span class="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        v-model="addForm.global_role"
+                                        class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
+                                        :class="{ 'border-red-300': addForm.errors.global_role }"
+                                    >
+                                        <option value="developer">Developer</option>
+                                        <option value="qa">QA</option>
+                                        <option value="project_manager">Project Manager</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                    <InputError :message="addForm.errors.global_role" class="mt-1" />
+                                </div>
+                            </div>
+
+                            <!-- Email -->
+                            <div>
+                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
+                                    Email <span class="text-red-500">*</span>
+                                </label>
+                                <input
+                                    v-model="addForm.email"
+                                    type="email"
+                                    placeholder="budi@company.co.id"
+                                    class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
+                                    :class="{ 'border-red-300 focus:border-red-400 focus:ring-red-50': addForm.errors.email }"
+                                />
+                                <InputError :message="addForm.errors.email" class="mt-1" />
+                            </div>
+
+                            <!-- Bidang -->
+                            <div>
+                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
+                                    Bidang / Job Title <span class="text-red-500">*</span>
+                                </label>
+                                <input
+                                    v-model="addForm.job_title"
+                                    type="text"
+                                    placeholder="e.g. Backend Developer"
+                                    class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
+                                    :class="{ 'border-red-300 focus:border-red-400 focus:ring-red-50': addForm.errors.job_title }"
+                                />
+                                <InputError :message="addForm.errors.job_title" class="mt-1" />
+                            </div>
+
+                            <!-- Nomor HP -->
+                            <div>
+                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
+                                    Nomor HP
+                                </label>
+                                <div class="flex">
+                                    <span class="flex h-9 items-center rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 px-3 text-[13px] text-gray-500 select-none">
+                                        +62
+                                    </span>
+                                    <input
+                                        v-model="addForm.phone"
+                                        type="text"
+                                        placeholder="812-0001-0009"
+                                        class="h-9 min-w-0 flex-1 rounded-r-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
+                                        :class="{ 'border-red-300 focus:border-red-400 focus:ring-red-50': addForm.errors.phone }"
+                                    />
+                                </div>
+                                <InputError :message="addForm.errors.phone" class="mt-1" />
+                            </div>
+
+                            <!-- Info: default password -->
+                            <div class="rounded-lg bg-blue-50 px-3.5 py-3 text-[12.5px] text-blue-700">
+                                Password default: <strong>password</strong> — member dapat menggantinya setelah login pertama.
+                            </div>
+                        </form>
+
+                        <!-- Footer -->
+                        <div class="flex items-center justify-end gap-2.5 border-t border-gray-100 px-6 py-4">
+                            <button
+                                type="button"
+                                @click="showAddModal = false"
+                                class="h-9 rounded-lg border border-gray-200 bg-white px-4 text-[13px] font-medium text-gray-600 transition hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                @click="submitAdd"
+                                :disabled="addForm.processing"
+                                class="inline-flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-[13px] font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                            >
+                                <span v-if="addForm.processing" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                                Add Member
+                            </button>
+                        </div>
+
+                    </div>
+                </Transition>
+            </div>
+        </Transition>
+    </Teleport>
 </template>

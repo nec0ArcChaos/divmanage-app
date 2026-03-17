@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UserStoreRequest;
 use App\Models\Project;
 use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 
 class TeamController extends Controller
@@ -72,6 +75,28 @@ class TeamController extends Controller
             'stats'          => $stats,
             'activeProjects' => $activeProjects,
         ]);
+    }
+
+    public function store(UserStoreRequest $request): RedirectResponse
+    {
+        $rawPhone = $request->phone ? trim($request->phone) : null;
+        $phone    = $rawPhone ? '+62 ' . ltrim($rawPhone, '0') : null;
+
+        User::create([
+            'name'              => $request->name,
+            'username'          => $request->username,
+            'email'             => $request->email,
+            'password'          => Hash::make('password'),
+            'job_title'         => $request->job_title,
+            'department'        => 'IT Division',
+            'phone'             => $phone,
+            'global_role'       => $request->global_role,
+            'status'            => 'active',
+            'workspace_id'      => Auth::user()->workspace_id,
+            'email_verified_at' => now(),
+        ]);
+
+        return redirect()->route('team.index');
     }
 
     private function emptyStats(): array
