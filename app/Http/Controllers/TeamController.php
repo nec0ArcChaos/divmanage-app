@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
@@ -108,6 +109,31 @@ class TeamController extends Controller
         ]);
 
         return redirect()->route('team.index');
+    }
+
+    public function storeJobTitle(Request $request): RedirectResponse
+    {
+        abort_unless(Auth::user()->global_role === 'admin', 403);
+
+        $request->validate([
+            'name' => ['required', 'string', 'max:100', 'unique:job_titles,name'],
+        ], [
+            'name.required' => 'Nama bidang wajib diisi.',
+            'name.unique'   => 'Bidang ini sudah ada.',
+        ]);
+
+        JobTitle::create(['name' => $request->name]);
+
+        return back();
+    }
+
+    public function destroyJobTitle(JobTitle $jobTitle): RedirectResponse
+    {
+        abort_unless(Auth::user()->global_role === 'admin', 403);
+
+        $jobTitle->delete();
+
+        return back();
     }
 
     private function emptyStats(): array

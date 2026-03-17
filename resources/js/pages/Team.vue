@@ -8,9 +8,11 @@ import {
     Plus,
     Search,
     ShieldCheck,
+    Trash2,
     Users,
     X,
 } from 'lucide-vue-next';
+import { router } from '@inertiajs/vue3';
 import DashboardLayout from '@/layouts/DashboardLayout.vue';
 import InputError from '@/components/InputError.vue';
 import TomSelectInput from '@/components/TomSelectInput.vue';
@@ -137,6 +139,31 @@ function submitAdd() {
     });
 }
 
+// ── Manage Bidang Modal ────────────────────────────────────────────────────
+const showBidangModal = ref(false);
+
+const bidangForm = useForm({ name: '' });
+
+function openBidangModal() {
+    bidangForm.reset();
+    bidangForm.clearErrors();
+    showBidangModal.value = true;
+}
+
+function submitBidang() {
+    bidangForm.post('/job-titles', {
+        preserveScroll: true,
+        onSuccess: () => {
+            bidangForm.reset();
+            router.reload({ only: ['jobTitles'] });
+        },
+    });
+}
+
+function deleteBidang(id: number) {
+    router.delete(`/job-titles/${id}`, { preserveScroll: true });
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 const roleLabel: Record<GlobalRole, string> = {
     admin:           'Admin',
@@ -184,14 +211,24 @@ function avatarColor(id: number): string {
                 <h1 class="text-2xl font-bold tracking-tight text-gray-900">Team</h1>
                 <p class="mt-1 text-sm text-gray-500">Manage and view members of the IT division</p>
             </div>
-            <button
-                v-if="canManage"
-                @click="openAddModal"
-                class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
-            >
-                <Plus class="size-4" />
-                Add Member
-            </button>
+            <div class="flex items-center gap-2">
+                <button
+                    v-if="currentUser?.global_role === 'admin'"
+                    @click="openBidangModal"
+                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-[13px] font-semibold text-gray-600 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
+                >
+                    <Plus class="size-4" />
+                    Kelola Bidang
+                </button>
+                <button
+                    v-if="canManage"
+                    @click="openAddModal"
+                    class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98]"
+                >
+                    <Plus class="size-4" />
+                    Add Member
+                </button>
+            </div>
         </div>
 
         <!-- ── Stats Grid ───────────────────────────────────────────────── -->
@@ -454,6 +491,98 @@ function avatarColor(id: number): string {
 
         <div class="h-8" />
     </div>
+
+    <!-- ── Kelola Bidang Modal ──────────────────────────────────────────── -->
+    <Teleport to="body">
+        <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
+            <div
+                v-if="showBidangModal"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+                @click.self="showBidangModal = false"
+            >
+                <Transition
+                    enter-active-class="transition duration-200 ease-out"
+                    enter-from-class="scale-95 opacity-0"
+                    enter-to-class="scale-100 opacity-100"
+                    leave-active-class="transition duration-150 ease-in"
+                    leave-from-class="scale-100 opacity-100"
+                    leave-to-class="scale-95 opacity-0"
+                >
+                    <div v-if="showBidangModal" class="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
+
+                        <!-- Header -->
+                        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+                            <div>
+                                <h2 class="text-[16px] font-bold text-gray-900">Kelola Bidang</h2>
+                                <p class="mt-0.5 text-[12.5px] text-gray-400">Tambah atau hapus bidang / job title</p>
+                            </div>
+                            <button
+                                @click="showBidangModal = false"
+                                class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                            >
+                                <X class="size-4" />
+                            </button>
+                        </div>
+
+                        <!-- Existing list -->
+                        <div class="max-h-56 overflow-y-auto px-6 pt-4">
+                            <p class="mb-2 text-[11.5px] font-semibold uppercase tracking-wider text-gray-400">Bidang yang ada</p>
+                            <ul class="space-y-1">
+                                <li
+                                    v-for="jt in jobTitles"
+                                    :key="jt.id"
+                                    class="flex items-center justify-between rounded-lg px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
+                                >
+                                    <span>{{ jt.name }}</span>
+                                    <button
+                                        @click="deleteBidang(jt.id)"
+                                        class="flex h-6 w-6 items-center justify-center rounded-md text-gray-300 transition hover:bg-red-50 hover:text-red-500"
+                                        title="Hapus"
+                                    >
+                                        <Trash2 class="size-3.5" />
+                                    </button>
+                                </li>
+                                <li v-if="jobTitles.length === 0" class="py-3 text-center text-[13px] text-gray-400">
+                                    Belum ada bidang.
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- Add form -->
+                        <form class="px-6 pb-5 pt-4" @submit.prevent="submitBidang">
+                            <p class="mb-2 text-[11.5px] font-semibold uppercase tracking-wider text-gray-400">Tambah Bidang Baru</p>
+                            <div class="flex gap-2">
+                                <input
+                                    v-model="bidangForm.name"
+                                    type="text"
+                                    placeholder="e.g. Mobile Developer"
+                                    class="h-9 flex-1 rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
+                                    :class="{ 'border-red-300': bidangForm.errors.name }"
+                                />
+                                <button
+                                    type="submit"
+                                    :disabled="bidangForm.processing || !bidangForm.name.trim()"
+                                    class="inline-flex h-9 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-[13px] font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    <Plus class="size-4" />
+                                    Tambah
+                                </button>
+                            </div>
+                            <InputError :message="bidangForm.errors.name" class="mt-1" />
+                        </form>
+
+                    </div>
+                </Transition>
+            </div>
+        </Transition>
+    </Teleport>
 
     <!-- ── Add Member Modal ─────────────────────────────────────────────── -->
     <Teleport to="body">
