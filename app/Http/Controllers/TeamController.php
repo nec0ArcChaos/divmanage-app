@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class TeamController extends Controller
@@ -27,6 +28,7 @@ class TeamController extends Controller
                 'stats'          => $this->emptyStats(),
                 'activeProjects' => [],
                 'roles'          => [],
+                'statuses'       => [],
                 'jobTitles'      => [],
             ]);
         }
@@ -43,9 +45,11 @@ class TeamController extends Controller
                 'name'        => $u->name,
                 'username'    => $u->username,
                 'email'       => $u->email,
+                'phone'       => $u->phone,
                 'avatar'      => $u->avatar,
                 'global_role' => $u->global_role,
                 'status'      => $u->status,
+                'status_id'   => $u->status_id,
                 'job_title'   => $u->job_title,
                 'role_id'     => $u->role_id,
                 'job_id'      => $u->job_id,
@@ -85,6 +89,7 @@ class TeamController extends Controller
             'stats'          => $stats,
             'activeProjects' => $activeProjects,
             'roles'          => Role::orderBy('sort_order')->get(['id', 'slug', 'name']),
+            'statuses'       => MemberStatus::all(['id', 'slug', 'name']),
             'jobTitles'      => JobTitle::orderBy('name')->get(['id', 'name']),
         ]);
     }
@@ -107,6 +112,43 @@ class TeamController extends Controller
             'workspace_id'      => Auth::user()->workspace_id,
             'email_verified_at' => now(),
         ]);
+
+        return redirect()->route('team.index');
+    }
+
+    public function update(Request $request, User $user): RedirectResponse
+    {
+        abort_unless(in_array(Auth::user()->global_role, ['admin', 'project_manager']), 403);
+
+        $request->validate([
+            'name'      => ['required', 'string', 'max:255'],
+            'username'  => ['required', 'string', 'max:255', 'alpha_dash', Rule::unique('users', 'username')->ignore($user->id)],
+            'email'     => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'role_id'   => ['required', 'integer', Rule::exists('roles', 'id')],
+            'job_id'    => ['required', 'integer', Rule::exists('job_titles', 'id')],
+            'status_id' => ['required', 'integer', Rule::exists('member_statuses', 'id')],
+            'phone'     => ['nullable', 'string', 'max:30'],
+        ]);
+
+        $user->update([
+            'name'      => $request->name,
+            'username'  => $request->username,
+            'email'     => $request->email,
+            'role_id'   => $request->role_id,
+            'job_id'    => $request->job_id,
+            'status_id' => $request->status_id,
+            'phone'     => $request->phone ?: null,
+        ]);
+
+        return back();
+    }
+
+    public function destroy(User $user): RedirectResponse
+    {
+        abort_unless(Auth::user()->global_role === 'admin', 403);
+        abort_if($user->id === Auth::id(), 403);
+
+        $user->delete();
 
         return redirect()->route('team.index');
     }

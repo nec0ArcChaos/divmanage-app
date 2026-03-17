@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { Head, useForm, usePage } from '@inertiajs/vue3';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     Code2,
     FlaskConical,
     MoreHorizontal,
+    Pencil,
     Plus,
     Search,
     ShieldCheck,
@@ -12,7 +13,6 @@ import {
     Users,
     X,
 } from 'lucide-vue-next';
-import { router } from '@inertiajs/vue3';
 import DashboardLayout from '@/layouts/DashboardLayout.vue';
 import InputError from '@/components/InputError.vue';
 import TomSelectInput from '@/components/TomSelectInput.vue';
@@ -20,7 +20,7 @@ import TomSelectInput from '@/components/TomSelectInput.vue';
 defineOptions({ layout: DashboardLayout });
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type GlobalRole = 'admin' | 'project_manager' | 'developer' | 'qa';
+type GlobalRole   = 'admin' | 'project_manager' | 'developer' | 'qa';
 type MemberStatus = 'active' | 'on_leave' | 'inactive';
 
 interface MemberProject {
@@ -35,9 +35,11 @@ interface TeamMember {
     name: string;
     username: string;
     email: string;
+    phone: string | null;
     avatar: string | null;
     global_role: GlobalRole;
     status: MemberStatus;
+    status_id: number;
     job_title: string | null;
     role_id: number;
     job_id: number | null;
@@ -59,8 +61,9 @@ interface Stats {
     projectManagers: number;
 }
 
-interface RoleOption     { id: number; slug: string; name: string }
-interface JobTitleOption { id: number; name: string }
+interface RoleOption      { id: number; slug: string; name: string }
+interface StatusOption    { id: number; slug: string; name: string }
+interface JobTitleOption  { id: number; name: string }
 
 // ── Props ──────────────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -68,6 +71,7 @@ const props = defineProps<{
     stats: Stats;
     activeProjects: ActiveProject[];
     roles: RoleOption[];
+    statuses: StatusOption[];
     jobTitles: JobTitleOption[];
 }>();
 
@@ -77,6 +81,7 @@ const currentUser = computed(() => (page.props.auth as any)?.user);
 const canManage   = computed(() =>
     ['admin', 'project_manager'].includes(currentUser.value?.global_role),
 );
+const isAdmin = computed(() => currentUser.value?.global_role === 'admin');
 
 // ── Filters ────────────────────────────────────────────────────────────────
 const searchQuery  = ref('');
@@ -85,12 +90,10 @@ const statusFilter = ref<'all' | MemberStatus>('all');
 
 const filteredMembers = computed(() => {
     let result = [...props.members];
-    if (roleFilter.value !== 'all') {
+    if (roleFilter.value !== 'all')
         result = result.filter(m => m.global_role === roleFilter.value);
-    }
-    if (statusFilter.value !== 'all') {
+    if (statusFilter.value !== 'all')
         result = result.filter(m => m.status === statusFilter.value);
-    }
     if (searchQuery.value.trim()) {
         const q = searchQuery.value.toLowerCase();
         result = result.filter(
@@ -111,6 +114,99 @@ const roleOptions = computed(() =>
 const jobTitleOptions = computed(() =>
     props.jobTitles.map(j => ({ value: j.id, label: j.name })),
 );
+const statusOptions = computed(() =>
+    props.statuses.map(s => ({ value: s.id, label: s.name })),
+);
+
+// ── Dropdown ───────────────────────────────────────────────────────────────
+const openDropdownId = ref<number | null>(null);
+const dropdownMember = ref<TeamMember | null>(null);
+const dropdownPos    = ref({ top: 0, left: 0 });
+
+function toggleDropdown(member: TeamMember, event: MouseEvent) {
+    event.stopPropagation();
+    if (openDropdownId.value === member.id) {
+        openDropdownId.value = null;
+        return;
+    }
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    dropdownPos.value = {
+        top:  rect.bottom + 4,
+        left: Math.max(8, rect.right - 144),
+    };
+    dropdownMember.value = member;
+    openDropdownId.value  = member.id;
+}
+
+function closeDropdown() { openDropdownId.value = null; }
+
+onMounted(()   => document.addEventListener('click', closeDropdown));
+onUnmounted(() => document.removeEventListener('click', closeDropdown));
+
+// ── View Modal ─────────────────────────────────────────────────────────────
+const showViewModal = ref(false);
+const viewMember    = ref<TeamMember | null>(null);
+
+function openViewModal(member: TeamMember) {
+    viewMember.value   = member;
+    showViewModal.value = true;
+    closeDropdown();
+}
+
+// ── Edit Modal ─────────────────────────────────────────────────────────────
+const showEditModal = ref(false);
+const editUserId    = ref(0);
+
+const editForm = useForm({
+    name:      '',
+    username:  '',
+    email:     '',
+    role_id:   '' as number | '',
+    job_id:    '' as number | '',
+    status_id: '' as number | '',
+    phone:     '',
+});
+
+function openEditModal(member: TeamMember) {
+    editUserId.value    = member.id;
+    editForm.name       = member.name;
+    editForm.username   = member.username;
+    editForm.email      = member.email;
+    editForm.role_id    = member.role_id;
+    editForm.job_id     = member.job_id ?? '';
+    editForm.status_id  = member.status_id;
+    editForm.phone      = member.phone ?? '';
+    editForm.clearErrors();
+    showEditModal.value = true;
+    closeDropdown();
+}
+
+function submitEdit() {
+    editForm.put(`/team/${editUserId.value}`, {
+        preserveScroll: true,
+        onSuccess: () => { showEditModal.value = false; },
+    });
+}
+
+// ── Delete Confirm ─────────────────────────────────────────────────────────
+const showDeleteConfirm = ref(false);
+const deleteTarget      = ref<TeamMember | null>(null);
+const deleting          = ref(false);
+
+function openDeleteConfirm(member: TeamMember) {
+    deleteTarget.value      = member;
+    showDeleteConfirm.value = true;
+    closeDropdown();
+}
+
+function executeDelete() {
+    if (!deleteTarget.value) return;
+    deleting.value = true;
+    router.delete(`/team/${deleteTarget.value.id}`, {
+        onFinish:  () => { deleting.value = false; },
+        onSuccess: () => { showDeleteConfirm.value = false; },
+    });
+}
 
 // ── Add Member Modal ───────────────────────────────────────────────────────
 const showAddModal = ref(false);
@@ -141,8 +237,7 @@ function submitAdd() {
 
 // ── Manage Bidang Modal ────────────────────────────────────────────────────
 const showBidangModal = ref(false);
-
-const bidangForm = useForm({ name: '' });
+const bidangForm      = useForm({ name: '' });
 
 function openBidangModal() {
     bidangForm.reset();
@@ -191,6 +286,12 @@ const statusBadgeClass: Record<MemberStatus, string> = {
     inactive: 'bg-gray-100 text-gray-500 ring-1 ring-gray-200',
 };
 
+const projectRoleLabel: Record<string, string> = {
+    project_manager: 'Project Manager',
+    developer:       'Developer',
+    qa:              'QA',
+};
+
 const avatarColors = [
     'bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500',
     'bg-rose-500',  'bg-teal-500',   'bg-indigo-500',  'bg-sky-500',
@@ -213,7 +314,7 @@ function avatarColor(id: number): string {
             </div>
             <div class="flex items-center gap-2">
                 <button
-                    v-if="currentUser?.global_role === 'admin'"
+                    v-if="isAdmin"
                     @click="openBidangModal"
                     class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-[13px] font-semibold text-gray-600 shadow-sm transition hover:bg-gray-50 active:scale-[0.98]"
                 >
@@ -233,7 +334,6 @@ function avatarColor(id: number): string {
 
         <!-- ── Stats Grid ───────────────────────────────────────────────── -->
         <div class="mb-7 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <!-- Total Members -->
             <div class="rounded-xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
@@ -245,8 +345,6 @@ function avatarColor(id: number): string {
                     </div>
                 </div>
             </div>
-
-            <!-- Developers -->
             <div class="rounded-xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
@@ -258,8 +356,6 @@ function avatarColor(id: number): string {
                     </div>
                 </div>
             </div>
-
-            <!-- QA Engineers -->
             <div class="rounded-xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
@@ -271,8 +367,6 @@ function avatarColor(id: number): string {
                     </div>
                 </div>
             </div>
-
-            <!-- Project Managers -->
             <div class="rounded-xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
@@ -288,7 +382,6 @@ function avatarColor(id: number): string {
 
         <!-- ── Filter Bar ───────────────────────────────────────────────── -->
         <div class="mb-6 flex flex-wrap items-center gap-3">
-            <!-- Search -->
             <div class="relative min-w-[200px] max-w-xs flex-1">
                 <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
                 <input
@@ -298,8 +391,6 @@ function avatarColor(id: number): string {
                     class="h-9 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
                 />
             </div>
-
-            <!-- Role filter -->
             <select
                 v-model="roleFilter"
                 class="h-9 rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-600 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
@@ -310,8 +401,6 @@ function avatarColor(id: number): string {
                 <option value="developer">Developer</option>
                 <option value="qa">QA</option>
             </select>
-
-            <!-- Status filter -->
             <select
                 v-model="statusFilter"
                 class="h-9 rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-600 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
@@ -321,7 +410,6 @@ function avatarColor(id: number): string {
                 <option value="on_leave">On Leave</option>
                 <option value="inactive">Inactive</option>
             </select>
-
             <span class="ml-auto text-[12.5px] text-gray-400">
                 Showing <strong class="font-semibold text-gray-700">{{ filteredMembers.length }}</strong>
                 of <strong class="font-semibold text-gray-700">{{ members.length }}</strong> members
@@ -359,9 +447,7 @@ function avatarColor(id: number): string {
                             <!-- Member -->
                             <td class="px-5 py-3.5">
                                 <div class="flex items-center gap-3">
-                                    <div
-                                        :class="['flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white', avatarColor(member.id)]"
-                                    >
+                                    <div :class="['flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white', avatarColor(member.id)]">
                                         {{ member.initials }}
                                     </div>
                                     <div>
@@ -414,12 +500,19 @@ function avatarColor(id: number): string {
                             <!-- Actions -->
                             <td class="px-5 py-3.5">
                                 <div class="flex items-center gap-1.5">
-                                    <button class="inline-flex h-7 items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 text-[12px] font-medium text-gray-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                                    <button
+                                        @click="openViewModal(member)"
+                                        class="inline-flex h-7 items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 text-[12px] font-medium text-gray-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                                    >
                                         View
                                     </button>
                                     <button
                                         v-if="canManage"
-                                        class="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                                        @click="toggleDropdown(member, $event)"
+                                        :class="[
+                                            'flex h-7 w-7 items-center justify-center rounded-md border bg-white text-gray-400 transition hover:bg-gray-100 hover:text-gray-600',
+                                            openDropdownId === member.id ? 'border-gray-300 bg-gray-100 text-gray-600' : 'border-gray-200',
+                                        ]"
                                     >
                                         <MoreHorizontal class="size-3.5" />
                                     </button>
@@ -427,7 +520,6 @@ function avatarColor(id: number): string {
                             </td>
                         </tr>
 
-                        <!-- Empty state -->
                         <tr v-if="filteredMembers.length === 0">
                             <td colspan="7" class="py-12 text-center text-[13px] text-gray-400">
                                 No members match your filters.
@@ -444,37 +536,26 @@ function avatarColor(id: number): string {
                 <p class="text-[15px] font-semibold text-gray-900">Project Assignments</p>
                 <p class="mt-0.5 text-[12.5px] text-gray-400">Team distribution across active projects</p>
             </div>
-
             <div v-if="activeProjects.length === 0" class="py-10 text-center text-[13px] text-gray-400">
                 No active projects.
             </div>
-
             <div
                 v-for="project in activeProjects"
                 :key="project.id"
                 class="flex items-center justify-between gap-4 border-b border-gray-50 px-5 py-4 transition-colors last:border-0 hover:bg-gray-50/60"
             >
                 <div class="flex min-w-0 items-center gap-2.5">
-                    <span
-                        class="h-2.5 w-2.5 shrink-0 rounded-full"
-                        :style="{ background: project.color }"
-                    />
+                    <span class="h-2.5 w-2.5 shrink-0 rounded-full" :style="{ background: project.color }" />
                     <div>
                         <p class="text-[14px] font-semibold text-gray-800">{{ project.name }}</p>
                         <p class="mt-0.5 text-[12px] text-gray-400">{{ project.members.length }} member{{ project.members.length !== 1 ? 's' : '' }}</p>
                     </div>
                 </div>
-
-                <!-- Avatar stack -->
                 <div class="flex items-center">
                     <div
                         v-for="(member, idx) in project.members.slice(0, 4)"
                         :key="idx"
-                        :class="[
-                            'flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[11px] font-bold text-white',
-                            idx > 0 ? '-ml-2' : '',
-                            avatarColor(idx),
-                        ]"
+                        :class="['flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-[11px] font-bold text-white', idx > 0 ? '-ml-2' : '', avatarColor(idx)]"
                         :title="member.name"
                     >
                         {{ member.initials }}
@@ -492,46 +573,303 @@ function avatarColor(id: number): string {
         <div class="h-8" />
     </div>
 
-    <!-- ── Kelola Bidang Modal ──────────────────────────────────────────── -->
+    <!-- ── Dropdown (teleported to avoid overflow clipping) ─────────────── -->
     <Teleport to="body">
         <Transition
-            enter-active-class="transition duration-200 ease-out"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-active-class="transition duration-150 ease-in"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
+            enter-active-class="transition duration-100 ease-out"
+            enter-from-class="scale-95 opacity-0"
+            enter-to-class="scale-100 opacity-100"
+            leave-active-class="transition duration-75 ease-in"
+            leave-from-class="scale-100 opacity-100"
+            leave-to-class="scale-95 opacity-0"
         >
             <div
-                v-if="showBidangModal"
-                class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-                @click.self="showBidangModal = false"
+                v-if="openDropdownId !== null && dropdownMember"
+                class="fixed z-[200] w-36 overflow-hidden rounded-xl bg-white py-1 shadow-lg ring-1 ring-gray-200"
+                :style="{ top: dropdownPos.top + 'px', left: dropdownPos.left + 'px' }"
+                @click.stop
             >
-                <Transition
-                    enter-active-class="transition duration-200 ease-out"
-                    enter-from-class="scale-95 opacity-0"
-                    enter-to-class="scale-100 opacity-100"
-                    leave-active-class="transition duration-150 ease-in"
-                    leave-from-class="scale-100 opacity-100"
-                    leave-to-class="scale-95 opacity-0"
+                <button
+                    @click="openEditModal(dropdownMember)"
+                    class="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] text-gray-700 transition hover:bg-gray-50"
                 >
-                    <div v-if="showBidangModal" class="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
+                    <Pencil class="size-3.5 text-gray-400" />
+                    Edit
+                </button>
+                <button
+                    v-if="isAdmin"
+                    @click="openDeleteConfirm(dropdownMember)"
+                    class="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] text-red-600 transition hover:bg-red-50"
+                >
+                    <Trash2 class="size-3.5" />
+                    Hapus
+                </button>
+            </div>
+        </Transition>
+    </Teleport>
+
+    <!-- ── View Member Modal ─────────────────────────────────────────────── -->
+    <Teleport to="body">
+        <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <div v-if="showViewModal && viewMember" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" @click.self="showViewModal = false">
+                <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="scale-95 opacity-0" enter-to-class="scale-100 opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="scale-100 opacity-100" leave-to-class="scale-95 opacity-0">
+                    <div v-if="showViewModal" class="w-full max-w-md rounded-2xl bg-white shadow-2xl">
 
                         <!-- Header -->
+                        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+                            <h2 class="text-[16px] font-bold text-gray-900">Detail Member</h2>
+                            <button @click="showViewModal = false" class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
+                                <X class="size-4" />
+                            </button>
+                        </div>
+
+                        <!-- Body -->
+                        <div class="px-6 py-5">
+
+                            <!-- Avatar + name + badges -->
+                            <div class="flex items-center gap-4">
+                                <div :class="['flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-bold text-white', avatarColor(viewMember.id)]">
+                                    {{ viewMember.initials }}
+                                </div>
+                                <div>
+                                    <p class="text-[16px] font-bold text-gray-900">{{ viewMember.name }}</p>
+                                    <p class="text-[13px] text-gray-400">@{{ viewMember.username }}</p>
+                                    <div class="mt-1.5 flex flex-wrap gap-1.5">
+                                        <span :class="['inline-flex items-center rounded-md px-2 py-0.5 text-[11.5px] font-semibold', roleBadgeClass[viewMember.global_role]]">
+                                            {{ roleLabel[viewMember.global_role] }}
+                                        </span>
+                                        <span :class="['inline-flex items-center rounded-md px-2 py-0.5 text-[11.5px] font-semibold', statusBadgeClass[viewMember.status]]">
+                                            {{ statusLabel[viewMember.status] }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Info rows -->
+                            <dl class="mt-5 space-y-3 rounded-xl bg-gray-50 p-4">
+                                <div>
+                                    <dt class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Email</dt>
+                                    <dd class="mt-0.5 text-[13.5px] text-gray-700">{{ viewMember.email }}</dd>
+                                </div>
+                                <div v-if="viewMember.phone">
+                                    <dt class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Nomor HP</dt>
+                                    <dd class="mt-0.5 text-[13.5px] text-gray-700">{{ viewMember.phone }}</dd>
+                                </div>
+                                <div>
+                                    <dt class="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Bidang</dt>
+                                    <dd class="mt-0.5 text-[13.5px] text-gray-700">{{ viewMember.job_title ?? '—' }}</dd>
+                                </div>
+                            </dl>
+
+                            <!-- Projects -->
+                            <div class="mt-4">
+                                <p class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                                    Projects ({{ viewMember.projects.length }})
+                                </p>
+                                <div v-if="viewMember.projects.length === 0" class="text-[13px] text-gray-400">
+                                    Tidak ada project.
+                                </div>
+                                <div
+                                    v-for="proj in viewMember.projects"
+                                    :key="proj.id"
+                                    class="flex items-center gap-2.5 rounded-lg px-2 py-2 transition hover:bg-gray-50"
+                                >
+                                    <span class="h-2 w-2 shrink-0 rounded-full" :style="{ background: proj.color }" />
+                                    <span class="flex-1 text-[13.5px] text-gray-700">{{ proj.name }}</span>
+                                    <span class="text-[11.5px] text-gray-400">{{ projectRoleLabel[proj.role] ?? proj.role }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="flex justify-end gap-2 border-t border-gray-100 px-6 py-4">
+                            <button
+                                v-if="canManage"
+                                @click="openEditModal(viewMember); showViewModal = false"
+                                class="inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-[13px] font-medium text-gray-600 transition hover:bg-gray-50"
+                            >
+                                <Pencil class="size-3.5" /> Edit
+                            </button>
+                            <button @click="showViewModal = false" class="h-9 rounded-lg bg-gray-900 px-4 text-[13px] font-semibold text-white transition hover:bg-gray-700">
+                                Tutup
+                            </button>
+                        </div>
+
+                    </div>
+                </Transition>
+            </div>
+        </Transition>
+    </Teleport>
+
+    <!-- ── Edit Member Modal ─────────────────────────────────────────────── -->
+    <Teleport to="body">
+        <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" @click.self="showEditModal = false">
+                <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="scale-95 opacity-0" enter-to-class="scale-100 opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="scale-100 opacity-100" leave-to-class="scale-95 opacity-0">
+                    <div v-if="showEditModal" class="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+
+                        <!-- Header -->
+                        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+                            <div>
+                                <h2 class="text-[16px] font-bold text-gray-900">Edit Member</h2>
+                                <p class="mt-0.5 text-[12.5px] text-gray-400">Perubahan akan langsung tersimpan</p>
+                            </div>
+                            <button @click="showEditModal = false" class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
+                                <X class="size-4" />
+                            </button>
+                        </div>
+
+                        <!-- Form -->
+                        <form class="space-y-4 px-6 py-5" @submit.prevent="submitEdit">
+
+                            <!-- Nama Lengkap -->
+                            <div>
+                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">Nama Lengkap <span class="text-red-500">*</span></label>
+                                <input
+                                    v-model="editForm.name"
+                                    type="text"
+                                    class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
+                                    :class="{ 'border-red-300': editForm.errors.name }"
+                                />
+                                <InputError :message="editForm.errors.name" class="mt-1" />
+                            </div>
+
+                            <!-- Username | Role -->
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">Username <span class="text-red-500">*</span></label>
+                                    <input
+                                        v-model="editForm.username"
+                                        type="text"
+                                        class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
+                                        :class="{ 'border-red-300': editForm.errors.username }"
+                                    />
+                                    <InputError :message="editForm.errors.username" class="mt-1" />
+                                </div>
+                                <div>
+                                    <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">Role <span class="text-red-500">*</span></label>
+                                    <TomSelectInput v-model="editForm.role_id" :options="roleOptions" placeholder="Pilih role..." />
+                                    <InputError :message="editForm.errors.role_id" class="mt-1" />
+                                </div>
+                            </div>
+
+                            <!-- Email -->
+                            <div>
+                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">Email <span class="text-red-500">*</span></label>
+                                <input
+                                    v-model="editForm.email"
+                                    type="email"
+                                    class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
+                                    :class="{ 'border-red-300': editForm.errors.email }"
+                                />
+                                <InputError :message="editForm.errors.email" class="mt-1" />
+                            </div>
+
+                            <!-- Bidang | Status -->
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">Bidang <span class="text-red-500">*</span></label>
+                                    <TomSelectInput v-model="editForm.job_id" :options="jobTitleOptions" placeholder="Pilih bidang..." />
+                                    <InputError :message="editForm.errors.job_id" class="mt-1" />
+                                </div>
+                                <div>
+                                    <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">Status <span class="text-red-500">*</span></label>
+                                    <TomSelectInput v-model="editForm.status_id" :options="statusOptions" placeholder="Pilih status..." />
+                                    <InputError :message="editForm.errors.status_id" class="mt-1" />
+                                </div>
+                            </div>
+
+                            <!-- Nomor HP -->
+                            <div>
+                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">Nomor HP</label>
+                                <input
+                                    v-model="editForm.phone"
+                                    type="text"
+                                    placeholder="+62 812-0001-0001"
+                                    class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
+                                />
+                                <InputError :message="editForm.errors.phone" class="mt-1" />
+                            </div>
+                        </form>
+
+                        <!-- Footer -->
+                        <div class="flex items-center justify-end gap-2.5 border-t border-gray-100 px-6 py-4">
+                            <button type="button" @click="showEditModal = false" class="h-9 rounded-lg border border-gray-200 bg-white px-4 text-[13px] font-medium text-gray-600 transition hover:bg-gray-50">
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                @click="submitEdit"
+                                :disabled="editForm.processing"
+                                class="inline-flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-[13px] font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                            >
+                                <span v-if="editForm.processing" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                                Simpan
+                            </button>
+                        </div>
+
+                    </div>
+                </Transition>
+            </div>
+        </Transition>
+    </Teleport>
+
+    <!-- ── Delete Confirm Modal ──────────────────────────────────────────── -->
+    <Teleport to="body">
+        <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <div v-if="showDeleteConfirm && deleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" @click.self="showDeleteConfirm = false">
+                <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="scale-95 opacity-0" enter-to-class="scale-100 opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="scale-100 opacity-100" leave-to-class="scale-95 opacity-0">
+                    <div v-if="showDeleteConfirm" class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
+                                <Trash2 class="size-5 text-red-600" />
+                            </div>
+                            <div>
+                                <h3 class="text-[15px] font-bold text-gray-900">Hapus Member?</h3>
+                                <p class="mt-1 text-[13px] text-gray-500">
+                                    <strong class="text-gray-700">{{ deleteTarget.name }}</strong> akan dihapus permanen dari sistem. Tindakan ini tidak dapat dibatalkan.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="mt-5 flex justify-end gap-2.5">
+                            <button @click="showDeleteConfirm = false" class="h-9 rounded-lg border border-gray-200 bg-white px-4 text-[13px] font-medium text-gray-600 transition hover:bg-gray-50">
+                                Cancel
+                            </button>
+                            <button
+                                @click="executeDelete"
+                                :disabled="deleting"
+                                class="inline-flex h-9 items-center gap-2 rounded-lg bg-red-600 px-4 text-[13px] font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+                            >
+                                <span v-if="deleting" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                                Hapus
+                            </button>
+                        </div>
+
+                    </div>
+                </Transition>
+            </div>
+        </Transition>
+    </Teleport>
+
+    <!-- ── Kelola Bidang Modal ──────────────────────────────────────────── -->
+    <Teleport to="body">
+        <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <div v-if="showBidangModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" @click.self="showBidangModal = false">
+                <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="scale-95 opacity-0" enter-to-class="scale-100 opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="scale-100 opacity-100" leave-to-class="scale-95 opacity-0">
+                    <div v-if="showBidangModal" class="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
+
                         <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
                             <div>
                                 <h2 class="text-[16px] font-bold text-gray-900">Kelola Bidang</h2>
                                 <p class="mt-0.5 text-[12.5px] text-gray-400">Tambah atau hapus bidang / job title</p>
                             </div>
-                            <button
-                                @click="showBidangModal = false"
-                                class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                            >
+                            <button @click="showBidangModal = false" class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
                                 <X class="size-4" />
                             </button>
                         </div>
 
-                        <!-- Existing list -->
                         <div class="max-h-56 overflow-y-auto px-6 pt-4">
                             <p class="mb-2 text-[11.5px] font-semibold uppercase tracking-wider text-gray-400">Bidang yang ada</p>
                             <ul class="space-y-1">
@@ -541,11 +879,7 @@ function avatarColor(id: number): string {
                                     class="flex items-center justify-between rounded-lg px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
                                 >
                                     <span>{{ jt.name }}</span>
-                                    <button
-                                        @click="deleteBidang(jt.id)"
-                                        class="flex h-6 w-6 items-center justify-center rounded-md text-gray-300 transition hover:bg-red-50 hover:text-red-500"
-                                        title="Hapus"
-                                    >
+                                    <button @click="deleteBidang(jt.id)" class="flex h-6 w-6 items-center justify-center rounded-md text-gray-300 transition hover:bg-red-50 hover:text-red-500">
                                         <Trash2 class="size-3.5" />
                                     </button>
                                 </li>
@@ -555,7 +889,6 @@ function avatarColor(id: number): string {
                             </ul>
                         </div>
 
-                        <!-- Add form -->
                         <form class="px-6 pb-5 pt-4" @submit.prevent="submitBidang">
                             <p class="mb-2 text-[11.5px] font-semibold uppercase tracking-wider text-gray-400">Tambah Bidang Baru</p>
                             <div class="flex gap-2">
@@ -586,158 +919,80 @@ function avatarColor(id: number): string {
 
     <!-- ── Add Member Modal ─────────────────────────────────────────────── -->
     <Teleport to="body">
-        <Transition
-            enter-active-class="transition duration-200 ease-out"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-active-class="transition duration-150 ease-in"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-        >
-            <div
-                v-if="showAddModal"
-                class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-                @click.self="showAddModal = false"
-            >
-                <Transition
-                    enter-active-class="transition duration-200 ease-out"
-                    enter-from-class="scale-95 opacity-0"
-                    enter-to-class="scale-100 opacity-100"
-                    leave-active-class="transition duration-150 ease-in"
-                    leave-from-class="scale-100 opacity-100"
-                    leave-to-class="scale-95 opacity-0"
-                >
+        <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <div v-if="showAddModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" @click.self="showAddModal = false">
+                <Transition enter-active-class="transition duration-200 ease-out" enter-from-class="scale-95 opacity-0" enter-to-class="scale-100 opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="scale-100 opacity-100" leave-to-class="scale-95 opacity-0">
                     <div v-if="showAddModal" class="w-full max-w-md rounded-2xl bg-white shadow-2xl">
 
-                        <!-- Header -->
                         <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
                             <div>
                                 <h2 class="text-[16px] font-bold text-gray-900">Add New Member</h2>
                                 <p class="mt-0.5 text-[12.5px] text-gray-400">Member akan bisa login dengan password default</p>
                             </div>
-                            <button
-                                @click="showAddModal = false"
-                                class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                            >
+                            <button @click="showAddModal = false" class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
                                 <X class="size-4" />
                             </button>
                         </div>
 
-                        <!-- Form -->
                         <form class="space-y-4 px-6 py-5" @submit.prevent="submitAdd">
 
-                            <!-- Nama Lengkap -->
                             <div>
-                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
-                                    Nama Lengkap <span class="text-red-500">*</span>
-                                </label>
-                                <input
-                                    v-model="addForm.name"
-                                    type="text"
-                                    placeholder="e.g. Budi Santoso"
+                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">Nama Lengkap <span class="text-red-500">*</span></label>
+                                <input v-model="addForm.name" type="text" placeholder="e.g. Budi Santoso"
                                     class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
-                                    :class="{ 'border-red-300 focus:border-red-400 focus:ring-red-50': addForm.errors.name }"
-                                />
+                                    :class="{ 'border-red-300': addForm.errors.name }" />
                                 <InputError :message="addForm.errors.name" class="mt-1" />
                             </div>
 
-                            <!-- Username + Role (2 columns) -->
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
-                                        Username <span class="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        v-model="addForm.username"
-                                        type="text"
-                                        placeholder="budi_santoso"
+                                    <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">Username <span class="text-red-500">*</span></label>
+                                    <input v-model="addForm.username" type="text" placeholder="budi_santoso"
                                         class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
-                                        :class="{ 'border-red-300 focus:border-red-400 focus:ring-red-50': addForm.errors.username }"
-                                    />
+                                        :class="{ 'border-red-300': addForm.errors.username }" />
                                     <InputError :message="addForm.errors.username" class="mt-1" />
                                 </div>
                                 <div>
-                                    <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
-                                        Role <span class="text-red-500">*</span>
-                                    </label>
-                                    <TomSelectInput
-                                        v-model="addForm.role_id"
-                                        :options="roleOptions"
-                                        placeholder="Pilih role..."
-                                        :class="{ 'ts-error': addForm.errors.role_id }"
-                                    />
+                                    <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">Role <span class="text-red-500">*</span></label>
+                                    <TomSelectInput v-model="addForm.role_id" :options="roleOptions" placeholder="Pilih role..." />
                                     <InputError :message="addForm.errors.role_id" class="mt-1" />
                                 </div>
                             </div>
 
-                            <!-- Email -->
                             <div>
-                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
-                                    Email <span class="text-red-500">*</span>
-                                </label>
-                                <input
-                                    v-model="addForm.email"
-                                    type="email"
-                                    placeholder="budi@company.co.id"
+                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">Email <span class="text-red-500">*</span></label>
+                                <input v-model="addForm.email" type="email" placeholder="budi@company.co.id"
                                     class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
-                                    :class="{ 'border-red-300 focus:border-red-400 focus:ring-red-50': addForm.errors.email }"
-                                />
+                                    :class="{ 'border-red-300': addForm.errors.email }" />
                                 <InputError :message="addForm.errors.email" class="mt-1" />
                             </div>
 
-                            <!-- Bidang -->
                             <div>
-                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
-                                    Bidang / Job Title <span class="text-red-500">*</span>
-                                </label>
-                                <TomSelectInput
-                                    v-model="addForm.job_id"
-                                    :options="jobTitleOptions"
-                                    placeholder="Pilih bidang..."
-                                    :class="{ 'ts-error': addForm.errors.job_id }"
-                                />
+                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">Bidang / Job Title <span class="text-red-500">*</span></label>
+                                <TomSelectInput v-model="addForm.job_id" :options="jobTitleOptions" placeholder="Pilih bidang..." />
                                 <InputError :message="addForm.errors.job_id" class="mt-1" />
                             </div>
 
-                            <!-- Nomor HP -->
                             <div>
-                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
-                                    Nomor HP
-                                </label>
+                                <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">Nomor HP</label>
                                 <div class="flex">
-                                    <span class="flex h-9 items-center rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 px-3 text-[13px] text-gray-500 select-none">
-                                        +62
-                                    </span>
-                                    <input
-                                        v-model="addForm.phone"
-                                        type="text"
-                                        placeholder="812-0001-0009"
-                                        class="h-9 min-w-0 flex-1 rounded-r-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
-                                        :class="{ 'border-red-300 focus:border-red-400 focus:ring-red-50': addForm.errors.phone }"
-                                    />
+                                    <span class="flex h-9 items-center rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 px-3 text-[13px] text-gray-500 select-none">+62</span>
+                                    <input v-model="addForm.phone" type="text" placeholder="812-0001-0009"
+                                        class="h-9 min-w-0 flex-1 rounded-r-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50" />
                                 </div>
                                 <InputError :message="addForm.errors.phone" class="mt-1" />
                             </div>
 
-                            <!-- Info: default password -->
                             <div class="rounded-lg bg-blue-50 px-3.5 py-3 text-[12.5px] text-blue-700">
                                 Password default: <strong>password</strong> — member dapat menggantinya setelah login pertama.
                             </div>
                         </form>
 
-                        <!-- Footer -->
                         <div class="flex items-center justify-end gap-2.5 border-t border-gray-100 px-6 py-4">
-                            <button
-                                type="button"
-                                @click="showAddModal = false"
-                                class="h-9 rounded-lg border border-gray-200 bg-white px-4 text-[13px] font-medium text-gray-600 transition hover:bg-gray-50"
-                            >
+                            <button type="button" @click="showAddModal = false" class="h-9 rounded-lg border border-gray-200 bg-white px-4 text-[13px] font-medium text-gray-600 transition hover:bg-gray-50">
                                 Cancel
                             </button>
-                            <button
-                                type="button"
-                                @click="submitAdd"
-                                :disabled="addForm.processing"
+                            <button type="button" @click="submitAdd" :disabled="addForm.processing"
                                 class="inline-flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-[13px] font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
                             >
                                 <span v-if="addForm.processing" class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
