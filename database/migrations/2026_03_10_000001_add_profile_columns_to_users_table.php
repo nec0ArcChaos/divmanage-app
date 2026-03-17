@@ -11,16 +11,13 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->string('username')->unique()->after('name');
             $table->string('avatar')->nullable()->after('username');
-            $table->string('job_title')->nullable()->after('avatar');
-            $table->string('department')->nullable()->after('job_title');
+            $table->string('department')->nullable()->after('avatar');
             $table->string('phone')->nullable()->after('department');
-            $table->enum('global_role', ['admin', 'member'])->default('member')->after('phone');
-            $table->enum('status', ['active', 'on_leave', 'inactive'])->default('active')->after('global_role');
-            $table->boolean('two_factor_enabled')->default(false)->after('status');
+            $table->foreignId('role_id')->nullable()->constrained('roles')->nullOnDelete()->after('phone');
+            $table->foreignId('status_id')->nullable()->constrained('member_statuses')->nullOnDelete()->after('role_id');
+            $table->foreignId('job_id')->nullable()->constrained('job_titles')->nullOnDelete()->after('status_id');
+            $table->boolean('two_factor_enabled')->default(false)->after('job_id');
             $table->timestamp('last_login_at')->nullable()->after('two_factor_enabled');
-
-            $table->index('status');
-            $table->index('global_role');
         });
     }
 
@@ -29,9 +26,12 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->dropIndex(['status']);
             $table->dropIndex(['global_role']);
+            $table->dropForeign(['role_id']);
+            $table->dropForeign(['status_id']);
+            $table->dropForeign(['job_id']);
             $table->dropColumn([
-                'username', 'avatar', 'job_title', 'department', 'phone',
-                'global_role', 'status', 'two_factor_enabled', 'last_login_at',
+                'username', 'avatar', 'department', 'phone',
+                'role_id', 'status_id', 'job_id', 'two_factor_enabled', 'last_login_at',
             ]);
         });
     }

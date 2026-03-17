@@ -16,28 +16,29 @@ class UserStoreRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'        => ['required', 'string', 'max:255'],
-            'username'    => ['required', 'string', 'max:255', 'alpha_dash', Rule::unique('users', 'username')],
-            'email'       => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
-            'job_title'   => ['required', 'string', 'max:255'],
-            'phone'       => ['nullable', 'string', 'max:20'],
-            'global_role' => ['required', Rule::in(['admin', 'project_manager', 'developer', 'qa'])],
+            'name'     => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:255', 'alpha_dash', Rule::unique('users', 'username')],
+            'email'    => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')],
+            'role_id'  => ['required', 'integer', Rule::exists('roles', 'id')],
+            'job_id'   => ['required', 'integer', Rule::exists('job_titles', 'id')],
+            'phone'    => ['nullable', 'string', 'max:20'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'name.required'        => 'Full name is required.',
-            'username.required'    => 'Username is required.',
-            'username.alpha_dash'  => 'Username may only contain letters, numbers, dashes and underscores.',
-            'username.unique'      => 'This username is already taken.',
-            'email.required'       => 'Email address is required.',
-            'email.email'          => 'Please enter a valid email address.',
-            'email.unique'         => 'This email address is already registered.',
-            'job_title.required'   => 'Job title / field is required.',
-            'global_role.required' => 'Role is required.',
-            'global_role.in'       => 'Invalid role selected.',
+            'name.required'     => 'Full name is required.',
+            'username.required' => 'Username is required.',
+            'username.alpha_dash' => 'Username may only contain letters, numbers, dashes and underscores.',
+            'username.unique'   => 'This username is already taken.',
+            'email.required'    => 'Email address is required.',
+            'email.email'       => 'Please enter a valid email address.',
+            'email.unique'      => 'This email address is already registered.',
+            'role_id.required'  => 'Role is required.',
+            'role_id.exists'    => 'Invalid role selected.',
+            'job_id.required'   => 'Bidang / job title is required.',
+            'job_id.exists'     => 'Invalid job title selected.',
         ];
     }
 }

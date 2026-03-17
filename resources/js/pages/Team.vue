@@ -13,6 +13,7 @@ import {
 } from 'lucide-vue-next';
 import DashboardLayout from '@/layouts/DashboardLayout.vue';
 import InputError from '@/components/InputError.vue';
+import TomSelectInput from '@/components/TomSelectInput.vue';
 
 defineOptions({ layout: DashboardLayout });
 
@@ -36,6 +37,8 @@ interface TeamMember {
     global_role: GlobalRole;
     status: MemberStatus;
     job_title: string | null;
+    role_id: number;
+    job_id: number | null;
     initials: string;
     projects: MemberProject[];
 }
@@ -54,11 +57,16 @@ interface Stats {
     projectManagers: number;
 }
 
+interface RoleOption     { id: number; slug: string; name: string }
+interface JobTitleOption { id: number; name: string }
+
 // ── Props ──────────────────────────────────────────────────────────────────
 const props = defineProps<{
     members: TeamMember[];
     stats: Stats;
     activeProjects: ActiveProject[];
+    roles: RoleOption[];
+    jobTitles: JobTitleOption[];
 }>();
 
 // ── Auth / Permissions ─────────────────────────────────────────────────────
@@ -94,16 +102,24 @@ const filteredMembers = computed(() => {
     return result;
 });
 
+// ── TomSelect options ──────────────────────────────────────────────────────
+const roleOptions = computed(() =>
+    props.roles.map(r => ({ value: r.id, label: r.name })),
+);
+const jobTitleOptions = computed(() =>
+    props.jobTitles.map(j => ({ value: j.id, label: j.name })),
+);
+
 // ── Add Member Modal ───────────────────────────────────────────────────────
 const showAddModal = ref(false);
 
 const addForm = useForm({
-    name:        '',
-    username:    '',
-    email:       '',
-    job_title:   '',
-    phone:       '',
-    global_role: 'developer' as GlobalRole,
+    name:    '',
+    username: '',
+    email:   '',
+    role_id: '' as number | '',
+    job_id:  '' as number | '',
+    phone:   '',
 });
 
 function openAddModal() {
@@ -289,6 +305,7 @@ function avatarColor(id: number): string {
                     <thead>
                         <tr>
                             <th class="border-b border-gray-100 px-5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.6px] text-gray-400">Member</th>
+                            <th class="border-b border-gray-100 px-5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.6px] text-gray-400">Bidang</th>
                             <th class="border-b border-gray-100 px-5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.6px] text-gray-400">Role</th>
                             <th class="border-b border-gray-100 px-5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.6px] text-gray-400">Projects</th>
                             <th class="border-b border-gray-100 px-5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[0.6px] text-gray-400">Email</th>
@@ -315,6 +332,11 @@ function avatarColor(id: number): string {
                                         <p class="mt-0.5 text-[12px] text-gray-400">@{{ member.username }}</p>
                                     </div>
                                 </div>
+                            </td>
+
+                            <!-- Bidang -->
+                            <td class="px-5 py-3.5">
+                                <span class="text-[13px] text-gray-600">{{ member.job_title ?? '—' }}</span>
                             </td>
 
                             <!-- Role -->
@@ -370,7 +392,7 @@ function avatarColor(id: number): string {
 
                         <!-- Empty state -->
                         <tr v-if="filteredMembers.length === 0">
-                            <td colspan="6" class="py-12 text-center text-[13px] text-gray-400">
+                            <td colspan="7" class="py-12 text-center text-[13px] text-gray-400">
                                 No members match your filters.
                             </td>
                         </tr>
@@ -490,7 +512,7 @@ function avatarColor(id: number): string {
                                 <InputError :message="addForm.errors.name" class="mt-1" />
                             </div>
 
-                            <!-- Username + Email (2 columns) -->
+                            <!-- Username + Role (2 columns) -->
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
                                     <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
@@ -509,17 +531,13 @@ function avatarColor(id: number): string {
                                     <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
                                         Role <span class="text-red-500">*</span>
                                     </label>
-                                    <select
-                                        v-model="addForm.global_role"
-                                        class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
-                                        :class="{ 'border-red-300': addForm.errors.global_role }"
-                                    >
-                                        <option value="developer">Developer</option>
-                                        <option value="qa">QA</option>
-                                        <option value="project_manager">Project Manager</option>
-                                        <option value="admin">Admin</option>
-                                    </select>
-                                    <InputError :message="addForm.errors.global_role" class="mt-1" />
+                                    <TomSelectInput
+                                        v-model="addForm.role_id"
+                                        :options="roleOptions"
+                                        placeholder="Pilih role..."
+                                        :class="{ 'ts-error': addForm.errors.role_id }"
+                                    />
+                                    <InputError :message="addForm.errors.role_id" class="mt-1" />
                                 </div>
                             </div>
 
@@ -543,14 +561,13 @@ function avatarColor(id: number): string {
                                 <label class="mb-1.5 block text-[12.5px] font-semibold text-gray-700">
                                     Bidang / Job Title <span class="text-red-500">*</span>
                                 </label>
-                                <input
-                                    v-model="addForm.job_title"
-                                    type="text"
-                                    placeholder="e.g. Backend Developer"
-                                    class="h-9 w-full rounded-lg border border-gray-200 px-3 text-[13px] text-gray-700 outline-none transition focus:border-blue-300 focus:ring-3 focus:ring-blue-50"
-                                    :class="{ 'border-red-300 focus:border-red-400 focus:ring-red-50': addForm.errors.job_title }"
+                                <TomSelectInput
+                                    v-model="addForm.job_id"
+                                    :options="jobTitleOptions"
+                                    placeholder="Pilih bidang..."
+                                    :class="{ 'ts-error': addForm.errors.job_id }"
                                 />
-                                <InputError :message="addForm.errors.job_title" class="mt-1" />
+                                <InputError :message="addForm.errors.job_id" class="mt-1" />
                             </div>
 
                             <!-- Nomor HP -->

@@ -137,6 +137,7 @@ class ProjectController extends Controller
         $projects = $projects->values()->toArray();
 
         $workspaceUsers = User::where('workspace_id', $workspaceId)
+            ->with('jobTitle')
             ->orderBy('name')
             ->get()
             ->map(fn ($u) => [

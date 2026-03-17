@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UserStoreRequest;
+use App\Models\JobTitle;
+use App\Models\MemberStatus;
 use App\Models\Project;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
@@ -22,13 +25,17 @@ class TeamController extends Controller
                 'members'        => [],
                 'stats'          => $this->emptyStats(),
                 'activeProjects' => [],
+                'roles'          => [],
+                'jobTitles'      => [],
             ]);
         }
 
         $members = User::where('workspace_id', $workspaceId)
-            ->with(['projectMembers' => fn ($q) => $q->with('project')])
-            ->orderByRaw("FIELD(global_role, 'admin', 'project_manager', 'developer', 'qa')")
-            ->orderBy('name')
+            ->with(['projectMembers' => fn ($q) => $q->with('project'), 'role', 'memberStatus', 'jobTitle'])
+            ->join('roles', 'roles.id', '=', 'users.role_id')
+            ->orderBy('roles.sort_order')
+            ->orderBy('users.name')
+            ->select('users.*')
             ->get()
             ->map(fn (User $u) => [
                 'id'          => $u->id,
@@ -39,6 +46,8 @@ class TeamController extends Controller
                 'global_role' => $u->global_role,
                 'status'      => $u->status,
                 'job_title'   => $u->job_title,
+                'role_id'     => $u->role_id,
+                'job_id'      => $u->job_id,
                 'initials'    => $this->initials($u->name),
                 'projects'    => $u->projectMembers->map(fn ($pm) => [
                     'id'    => $pm->project_id,
@@ -74,6 +83,8 @@ class TeamController extends Controller
             'members'        => $members,
             'stats'          => $stats,
             'activeProjects' => $activeProjects,
+            'roles'          => Role::orderBy('sort_order')->get(['id', 'slug', 'name']),
+            'jobTitles'      => JobTitle::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -87,11 +98,11 @@ class TeamController extends Controller
             'username'          => $request->username,
             'email'             => $request->email,
             'password'          => Hash::make('password'),
-            'job_title'         => $request->job_title,
+            'role_id'           => $request->role_id,
+            'status_id'         => MemberStatus::where('slug', 'active')->value('id'),
+            'job_id'            => $request->job_id,
             'department'        => 'IT Division',
             'phone'             => $phone,
-            'global_role'       => $request->global_role,
-            'status'            => 'active',
             'workspace_id'      => Auth::user()->workspace_id,
             'email_verified_at' => now(),
         ]);
