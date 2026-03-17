@@ -124,7 +124,7 @@ function avatarColor(id: number): string {
 <template>
     <Head title="Team" />
 
-    <div class="mx-auto max-w-[1200px] px-6 py-7">
+    <div>
 
         <!-- ── Page Header ──────────────────────────────────────────────── -->
         <div class="mb-7 flex flex-wrap items-end justify-between gap-4">
