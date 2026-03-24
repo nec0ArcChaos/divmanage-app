@@ -13,6 +13,7 @@ import {
     Users,
     X,
 } from 'lucide-vue-next';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import DashboardLayout from '@/layouts/DashboardLayout.vue';
 import InputError from '@/components/InputError.vue';
 import TomSelectInput from '@/components/TomSelectInput.vue';
@@ -669,15 +670,17 @@ function avatarColor(id: number): string {
                                 <div v-if="viewMember.projects.length === 0" class="text-[13px] text-gray-400">
                                     Tidak ada project.
                                 </div>
-                                <div
-                                    v-for="proj in viewMember.projects"
-                                    :key="proj.id"
-                                    class="flex items-center gap-2.5 rounded-lg px-2 py-2 transition hover:bg-gray-50"
-                                >
-                                    <span class="h-2 w-2 shrink-0 rounded-full" :style="{ background: proj.color }" />
-                                    <span class="flex-1 text-[13.5px] text-gray-700">{{ proj.name }}</span>
-                                    <span class="text-[11.5px] text-gray-400">{{ projectRoleLabel[proj.role] ?? proj.role }}</span>
-                                </div>
+                                <ScrollArea class="h-44">
+                                    <div
+                                        v-for="proj in viewMember.projects"
+                                        :key="proj.id"
+                                        class="flex items-center gap-2.5 rounded-lg px-2 py-2 transition hover:bg-gray-50"
+                                    >
+                                        <span class="h-2 w-2 shrink-0 rounded-full" :style="{ background: proj.color }" />
+                                        <span class="flex-1 text-[13.5px] text-gray-700">{{ proj.name }}</span>
+                                        <span class="text-[11.5px] text-gray-400">{{ projectRoleLabel[proj.role] ?? proj.role }}</span>
+                                    </div>
+                                </ScrollArea>
                             </div>
                         </div>
 
