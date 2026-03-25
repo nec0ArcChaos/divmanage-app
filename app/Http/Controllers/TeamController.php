@@ -153,6 +153,19 @@ class TeamController extends Controller
         return redirect()->route('team.index');
     }
 
+    public function updateStatus(Request $request, User $user): RedirectResponse
+    {
+        abort_unless(in_array(Auth::user()->global_role, ['admin', 'project_manager']), 403);
+
+        $request->validate([
+            'status_id' => ['required', 'integer', Rule::exists('member_statuses', 'id')],
+        ]);
+
+        $user->update(['status_id' => $request->status_id]);
+
+        return back();
+    }
+
     public function storeJobTitle(Request $request): RedirectResponse
     {
         abort_unless(Auth::user()->global_role === 'admin', 403);

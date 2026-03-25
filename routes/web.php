@@ -15,6 +15,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('team', [TeamController::class, 'store'])->name('team.store');
     Route::put('team/{user}', [TeamController::class, 'update'])->name('team.update');
     Route::delete('team/{user}', [TeamController::class, 'destroy'])->name('team.destroy');
+    Route::patch('team/{user}/status', [TeamController::class, 'updateStatus'])->name('team.updateStatus');
     Route::post('job-titles', [TeamController::class, 'storeJobTitle'])->name('job-titles.store');
     Route::delete('job-titles/{jobTitle}', [TeamController::class, 'destroyJobTitle'])->name('job-titles.destroy');
 

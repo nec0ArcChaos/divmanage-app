@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import {
     AlertTriangle,
@@ -213,25 +213,40 @@ function capitalize(s: string): string {
 const openStatusDropdownId   = ref<number | null>(null);
 const openStatusDropdownTask = ref<TaskItem | null>(null);
 const dropdownPos            = ref({ top: 0, left: 0 });
+const statusDropdownTrigger  = ref<HTMLElement | null>(null);
+
+function updateStatusDropdownPos() {
+    if (!statusDropdownTrigger.value) return;
+    const rect = statusDropdownTrigger.value.getBoundingClientRect();
+    dropdownPos.value = { top: rect.bottom + 4, left: rect.left };
+}
+
+function closeStatusDropdown() {
+    openStatusDropdownId.value   = null;
+    openStatusDropdownTask.value = null;
+    statusDropdownTrigger.value  = null;
+    window.removeEventListener('scroll', updateStatusDropdownPos, { capture: true });
+}
+
+onMounted(()   => document.addEventListener('click', closeStatusDropdown));
+onUnmounted(() => document.removeEventListener('click', closeStatusDropdown));
 
 function toggleStatusDropdown(event: MouseEvent, task: TaskItem) {
     if (openStatusDropdownId.value === task.id) {
-        openStatusDropdownId.value   = null;
-        openStatusDropdownTask.value = null;
+        closeStatusDropdown();
         return;
     }
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    dropdownPos.value = {
-        top:  rect.bottom + 4,
-        left: rect.left,
-    };
+    const el   = event.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    statusDropdownTrigger.value  = el;
+    dropdownPos.value            = { top: rect.bottom + 4, left: rect.left };
     openStatusDropdownId.value   = task.id;
     openStatusDropdownTask.value = task;
+    window.addEventListener('scroll', updateStatusDropdownPos, { passive: true, capture: true });
 }
 
 function updateTaskStatus(task: TaskItem, status: TaskStatusItem) {
-    openStatusDropdownId.value   = null;
-    openStatusDropdownTask.value = null;
+    closeStatusDropdown();
     router.patch(
         `/tasks/${task.id}/status`,
         { task_status_id: status.id },
@@ -312,19 +327,13 @@ function deleteTask(task: TaskItem) {
 <template>
     <Head title="My Tasks" />
 
-    <!-- Transparent backdrop — closes status dropdown on outside click -->
-    <div
-        v-if="openStatusDropdownId !== null"
-        class="fixed inset-0 z-[19]"
-        @click="openStatusDropdownId = null; openStatusDropdownTask = null"
-    />
-
     <!-- Teleported status dropdown — fixed position, escapes overflow clipping -->
     <Teleport to="body">
         <div
             v-if="openStatusDropdownTask"
             :style="{ position: 'fixed', top: dropdownPos.top + 'px', left: dropdownPos.left + 'px' }"
             class="z-[20] min-w-[160px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+            @click.stop
         >
             <button
                 v-for="s in taskStatuses"

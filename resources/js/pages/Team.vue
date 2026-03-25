@@ -2,6 +2,8 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import {
+    Check,
+    ChevronDown,
     Code2,
     FlaskConical,
     MoreHorizontal,
@@ -120,29 +122,85 @@ const statusOptions = computed(() =>
 );
 
 // ── Dropdown ───────────────────────────────────────────────────────────────
-const openDropdownId = ref<number | null>(null);
-const dropdownMember = ref<TeamMember | null>(null);
-const dropdownPos    = ref({ top: 0, left: 0 });
+const openDropdownId  = ref<number | null>(null);
+const dropdownMember  = ref<TeamMember | null>(null);
+const dropdownPos     = ref({ top: 0, left: 0 });
+const dropdownTrigger = ref<HTMLElement | null>(null);
+
+function updateDropdownPos() {
+    if (!dropdownTrigger.value) return;
+    const rect = dropdownTrigger.value.getBoundingClientRect();
+    dropdownPos.value = {
+        top:  rect.bottom + 4,
+        left: Math.max(8, rect.right - 144),
+    };
+}
+
+function closeStatusDropdown() {
+    openStatusDropdownId.value     = null;
+    openStatusDropdownMember.value = null;
+    statusDropdownTrigger.value    = null;
+    window.removeEventListener('scroll', updateStatusDropdownPos, { capture: true });
+}
+
+function closeDropdown() {
+    openDropdownId.value  = null;
+    dropdownTrigger.value = null;
+    window.removeEventListener('scroll', updateDropdownPos, { capture: true });
+    closeStatusDropdown();
+}
 
 function toggleDropdown(member: TeamMember, event: MouseEvent) {
     event.stopPropagation();
     if (openDropdownId.value === member.id) {
-        openDropdownId.value = null;
+        closeDropdown();
         return;
     }
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const el   = event.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    dropdownTrigger.value = el;
     dropdownPos.value = {
         top:  rect.bottom + 4,
         left: Math.max(8, rect.right - 144),
     };
     dropdownMember.value = member;
     openDropdownId.value  = member.id;
+    window.addEventListener('scroll', updateDropdownPos, { passive: true, capture: true });
 }
-
-function closeDropdown() { openDropdownId.value = null; }
 
 onMounted(()   => document.addEventListener('click', closeDropdown));
 onUnmounted(() => document.removeEventListener('click', closeDropdown));
+
+// ── Inline Status Dropdown ─────────────────────────────────────────────────
+const openStatusDropdownId     = ref<number | null>(null);
+const openStatusDropdownMember = ref<TeamMember | null>(null);
+const dropdownStatusPos        = ref({ top: 0, left: 0 });
+const statusDropdownTrigger    = ref<HTMLElement | null>(null);
+
+function updateStatusDropdownPos() {
+    if (!statusDropdownTrigger.value) return;
+    const rect = statusDropdownTrigger.value.getBoundingClientRect();
+    dropdownStatusPos.value = { top: rect.bottom + 4, left: rect.left };
+}
+
+function toggleStatusDropdown(event: MouseEvent, member: TeamMember) {
+    if (openStatusDropdownId.value === member.id) {
+        closeStatusDropdown();
+        return;
+    }
+    const el   = event.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    statusDropdownTrigger.value    = el;
+    dropdownStatusPos.value        = { top: rect.bottom + 4, left: rect.left };
+    openStatusDropdownId.value     = member.id;
+    openStatusDropdownMember.value = member;
+    window.addEventListener('scroll', updateStatusDropdownPos, { passive: true, capture: true });
+}
+
+function updateMemberStatus(member: TeamMember, statusId: number) {
+    closeStatusDropdown();
+    router.patch(`/team/${member.id}/status`, { status_id: statusId }, { preserveScroll: true });
+}
 
 // ── View Modal ─────────────────────────────────────────────────────────────
 const showViewModal = ref(false);
@@ -285,6 +343,12 @@ const statusBadgeClass: Record<MemberStatus, string> = {
     active:   'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
     on_leave: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
     inactive: 'bg-gray-100 text-gray-500 ring-1 ring-gray-200',
+};
+
+const statusDotClass: Record<string, string> = {
+    active:   'bg-emerald-500',
+    on_leave: 'bg-amber-500',
+    inactive: 'bg-gray-400',
 };
 
 const projectRoleLabel: Record<string, string> = {
@@ -493,7 +557,18 @@ function avatarColor(id: number): string {
 
                             <!-- Status -->
                             <td class="px-5 py-3.5">
-                                <span :class="['inline-flex items-center rounded-md px-2 py-0.5 text-[11.5px] font-semibold', statusBadgeClass[member.status]]">
+                                <button
+                                    v-if="canManage"
+                                    @click.stop="toggleStatusDropdown($event, member)"
+                                    :class="['inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-0.5 text-[11.5px] font-semibold transition hover:opacity-80', statusBadgeClass[member.status]]"
+                                >
+                                    {{ statusLabel[member.status] }}
+                                    <ChevronDown class="size-3 opacity-60" />
+                                </button>
+                                <span
+                                    v-else
+                                    :class="['inline-flex items-center rounded-md px-2 py-0.5 text-[11.5px] font-semibold', statusBadgeClass[member.status]]"
+                                >
                                     {{ statusLabel[member.status] }}
                                 </span>
                             </td>
@@ -918,6 +993,28 @@ function avatarColor(id: number): string {
                 </Transition>
             </div>
         </Transition>
+    </Teleport>
+
+    <!-- ── Inline Status Dropdown ───────────────────────────────────────── -->
+    <Teleport to="body">
+        <div
+            v-if="openStatusDropdownMember"
+            class="fixed z-[20] min-w-[160px] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+            :style="{ top: dropdownStatusPos.top + 'px', left: dropdownStatusPos.left + 'px' }"
+            @click.stop
+        >
+            <button
+                v-for="s in statuses"
+                :key="s.id"
+                class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] text-gray-700 transition hover:bg-gray-50"
+                :class="{ 'bg-blue-50 font-semibold text-blue-700': s.id === openStatusDropdownMember.status_id }"
+                @click.stop="updateMemberStatus(openStatusDropdownMember!, s.id)"
+            >
+                <span :class="['h-2 w-2 shrink-0 rounded-full', statusDotClass[s.slug]]" />
+                {{ s.name }}
+                <Check v-if="s.id === openStatusDropdownMember.status_id" class="ml-auto size-3 text-blue-600" />
+            </button>
+        </div>
     </Teleport>
 
     <!-- ── Add Member Modal ─────────────────────────────────────────────── -->
