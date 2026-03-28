@@ -23,6 +23,7 @@ import {
 import DashboardLayout from '@/layouts/DashboardLayout.vue';
 import InputError from '@/components/InputError.vue';
 import TomSelectInput from '@/components/TomSelectInput.vue';
+import TaskDetailModal from '@/components/TaskDetailModal.vue';
 
 defineOptions({ layout: DashboardLayout });
 
@@ -73,6 +74,7 @@ interface MemberTask {
     status: TaskStatusInfo | null;
     assignorName: string;
     assignedAt: string | null;
+    comment_count: number;
 }
 
 interface MemberTaskGroup {
@@ -190,6 +192,21 @@ const showTaskModal    = ref(false);
 const selectedProject  = ref<ProjectItem | null>(null);
 const slideOverTab     = ref<SlideOverTab>('details');
 const slideOverEditing = ref(false);
+
+// ── Task detail modal state ─────────────────────────────────────────────────
+const showTaskDetail  = ref(false);
+const selectedTask    = ref<MemberTask | null>(null);
+
+function openTaskDetail(task: MemberTask) {
+    selectedTask.value   = task;
+    showTaskDetail.value = true;
+}
+
+function onCommentAdded() {
+    if (selectedTask.value && selectedProject.value) {
+        selectedTask.value.comment_count++;
+    }
+}
 
 // ── Filter state ───────────────────────────────────────────────────────────
 const searchInput  = ref(props.filters.search);
@@ -947,7 +964,8 @@ function priorityBadge(priority: string): string {
                                         <div
                                             v-for="task in group.tasks"
                                             :key="task.id"
-                                            class="flex items-center gap-2.5 rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-sm"
+                                            class="flex cursor-pointer items-center gap-2.5 rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-sm transition hover:border-blue-200 hover:bg-blue-50/40"
+                                            @click="openTaskDetail(task)"
                                         >
                                             <!-- Status dot -->
                                             <span
@@ -964,6 +982,14 @@ function priorityBadge(priority: string): string {
                                                     by {{ task.assignorName }}<template v-if="task.assignedAt"> · {{ task.assignedAt }}</template>
                                                 </span>
                                             </div>
+                                            <!-- Comment count -->
+                                            <span
+                                                v-if="task.comment_count > 0"
+                                                class="flex shrink-0 items-center gap-1 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500"
+                                            >
+                                                <svg class="size-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                                                {{ task.comment_count }}
+                                            </span>
                                             <!-- Status badge -->
                                             <span
                                                 v-if="task.status"
@@ -1210,4 +1236,12 @@ function priorityBadge(priority: string): string {
             </div>
         </Transition>
     </Teleport>
+
+    <!-- ════ TASK DETAIL MODAL ════ -->
+    <TaskDetailModal
+        v-model="showTaskDetail"
+        :task="selectedTask"
+        :project-name="selectedProject?.name"
+        @comment-added="onCommentAdded"
+    />
 </template>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Link, useForm, usePage } from '@inertiajs/vue3';
-import { Bell, Menu, Search, Settings, LogOut } from 'lucide-vue-next';
+import { Menu, Search, Settings, LogOut } from 'lucide-vue-next';
 import { computed } from 'vue';
+import NotificationBell from '@/components/NotificationBell.vue';
 import { getInitials } from '@/composables/useInitials';
 import { logout } from '@/routes';
 import {
@@ -48,10 +49,7 @@ const handleLogout = () => form.post(logout().url);
         <!-- Right section -->
         <div class="ml-auto flex items-center gap-2">
             <!-- Notification bell -->
-            <button class="relative flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                <Bell class="size-[18px]" />
-                <span class="absolute right-1.5 top-1.5 flex h-2 w-2 items-center justify-center rounded-full bg-blue-500" />
-            </button>
+            <NotificationBell />
 
             <!-- User avatar dropdown -->
             <DropdownMenu>

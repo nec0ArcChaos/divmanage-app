@@ -33,6 +33,24 @@ class HandleInertiaRequests extends Middleware
      *
      * @return array<string, mixed>
      */
+    private function shareNotifications(Request $request): array
+    {
+        $user = $request->user();
+        if (! $user) {
+            return ['unread_count' => 0, 'recent' => []];
+        }
+
+        return [
+            'unread_count' => $user->unreadNotifications()->count(),
+            'recent' => $user->notifications()->latest()->take(15)->get()->map(fn ($n) => [
+                'id'         => $n->id,
+                'data'       => $n->data,
+                'read_at'    => $n->read_at,
+                'created_at' => $n->created_at->diffForHumans(),
+            ])->toArray(),
+        ];
+    }
+
     public function share(Request $request): array
     {
         return [
@@ -41,7 +59,8 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user()?->loadMissing('role', 'memberStatus', 'jobTitle'),
             ],
-            'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'sidebarOpen'   => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'notifications' => $this->shareNotifications($request),
         ];
     }
 }

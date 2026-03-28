@@ -1,8 +1,11 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectMemberController;
+use App\Http\Controllers\TaskAttachmentController;
+use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
@@ -33,6 +36,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
     Route::patch('tasks/{task}/status', [TaskController::class, 'updateStatus'])->name('tasks.updateStatus');
     Route::delete('tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
+
+    // Task comments
+    Route::get('tasks/{task}/comments', [TaskCommentController::class, 'index'])->name('task-comments.index');
+    Route::post('tasks/{task}/comments', [TaskCommentController::class, 'store'])->name('task-comments.store');
+    Route::delete('task-comments/{comment}', [TaskCommentController::class, 'destroy'])->name('task-comments.destroy');
+
+    // Task attachments
+    Route::get('task-attachments/{attachment}/download', [TaskAttachmentController::class, 'download'])->name('task-attachments.download');
+    Route::delete('task-attachments/{attachment}', [TaskAttachmentController::class, 'destroy'])->name('task-attachments.destroy');
+
+    // Notifications
+    Route::post('notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.readAll');
 });
 
 require __DIR__.'/settings.php';

@@ -89,13 +89,14 @@ class ProjectController extends Controller
                         'name'     => $user?->name ?? 'Unassigned',
                         'initials' => $user ? $this->initials($user->name) : '??',
                         'tasks'    => $tasks->map(fn ($t) => [
-                            'id'          => $t->id,
-                            'title'       => $t->title,
-                            'priority'    => $t->priority,
-                            'deadline'    => $t->deadline?->format('M d, Y'),
-                            'assignorName' => $t->creator?->name ?? 'Unknown',
-                            'assignedAt'   => $t->created_at?->format('M d, Y'),
-                            'status'      => $t->status ? [
+                            'id'            => $t->id,
+                            'title'         => $t->title,
+                            'priority'      => $t->priority,
+                            'deadline'      => $t->deadline?->format('M d, Y'),
+                            'assignorName'  => $t->creator?->name ?? 'Unknown',
+                            'assignedAt'    => $t->created_at?->format('M d, Y'),
+                            'comment_count' => $t->comments()->count(),
+                            'status'        => $t->status ? [
                                 'name'    => $t->status->name,
                                 'color'   => $t->status->color,
                                 'is_done' => $t->status->is_done,
