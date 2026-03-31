@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\NewNotificationCreated;
 use App\Events\TaskCommentCreated;
 use App\Models\ProjectMember;
 use App\Models\Task;
@@ -167,7 +168,18 @@ class TaskCommentController extends Controller
         $commenter = Auth::user();
 
         foreach ($notifyUsers as $user) {
-            $user->notify(new TaskCommentNotification($comment, $task, $commenter));
+            // notifyNow() stores synchronously so we can immediately get the DB record
+            $user->notifyNow(new TaskCommentNotification($comment, $task, $commenter));
+
+            $stored = $user->notifications()->latest()->first();
+            if ($stored) {
+                broadcast(new NewNotificationCreated($user->id, [
+                    'id'         => $stored->id,
+                    'data'       => $stored->data,
+                    'read_at'    => null,
+                    'created_at' => $stored->created_at->diffForHumans(),
+                ]));
+            }
         }
     }
 

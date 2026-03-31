@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     Calendar,
@@ -207,6 +207,29 @@ function onCommentAdded() {
         selectedTask.value.comment_count++;
     }
 }
+
+// Auto-open task modal when navigated from a notification link
+onMounted(() => {
+    const params    = new URLSearchParams(window.location.search);
+    const taskId    = Number(params.get('open_task'));
+    const projectId = Number(params.get('project_id'));
+
+    if (taskId && projectId) {
+        const project = props.projects.find((p) => p.id === projectId);
+        if (project) {
+            selectedProject.value = project;
+            for (const group of project.tasksByMember) {
+                const task = group.tasks.find((t) => t.id === taskId);
+                if (task) {
+                    openTaskDetail(task);
+                    break;
+                }
+            }
+        }
+        // Clean up the URL without triggering a page reload
+        history.replaceState(null, '', '/projects');
+    }
+});
 
 // ── Filter state ───────────────────────────────────────────────────────────
 const searchInput  = ref(props.filters.search);

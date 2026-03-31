@@ -2,11 +2,12 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import axios from 'axios';
 import { Bell, CheckCheck, MessageSquare } from 'lucide-vue-next';
-import { usePage } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 
 interface NotificationData {
     task_id: number;
     task_title: string;
+    project_id: number;
     project_name: string;
     commenter_name: string;
     comment_preview: string;
@@ -30,6 +31,7 @@ const open     = ref(false);
 const items    = ref<NotificationItem[]>([]);
 const unread   = ref(0);
 const dropdown = ref<HTMLDivElement | null>(null);
+const currentUserId = (page.props.auth as any)?.user?.id as number | null;
 
 // Sync from Inertia shared data on mount / page visits
 function syncFromPage() {
@@ -46,7 +48,19 @@ onMounted(() => {
     syncFromPage();
     document.addEventListener('click', onClickOutside);
 
-    // Poll every 30 seconds to keep notification count fresh
+    // Subscribe to real-time notifications for this user
+    if (currentUserId) {
+        window.Echo.private(`user.${currentUserId}`).listen(
+            '.notification.created',
+            (event: { notification: NotificationItem }) => {
+                // Prepend so newest appears first
+                items.value.unshift(event.notification);
+                unread.value++;
+            },
+        );
+    }
+
+    // Poll every 30 seconds as a fallback to keep state in sync
     pollInterval = setInterval(async () => {
         try {
             const { data } = await axios.get<NotificationsShared>('/notifications/counts');
@@ -61,6 +75,7 @@ onMounted(() => {
 onUnmounted(() => {
     document.removeEventListener('click', onClickOutside);
     if (pollInterval) clearInterval(pollInterval);
+    if (currentUserId) window.Echo.leave(`user.${currentUserId}`);
 });
 
 function onClickOutside(e: MouseEvent) {
@@ -80,6 +95,7 @@ async function markRead(item: NotificationItem) {
         }
     }
     open.value = false;
+    router.visit(`/projects?open_task=${item.data.task_id}&project_id=${item.data.project_id}`);
 }
 
 async function readAll() {
@@ -103,7 +119,7 @@ const hasUnread = computed(() => unread.value > 0);
         <button
             class="relative flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
             :title="unread > 0 ? `${unread} unread notifications` : 'Notifications'"
-            @click="open = !open; syncFromPage()"
+            @click="open = !open"
         >
             <Bell class="size-4.5" />
             <!-- Unread badge -->

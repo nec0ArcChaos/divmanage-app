@@ -14,3 +14,7 @@ Broadcast::channel('task.{taskId}', function ($user, $taskId) {
         ->where('user_id', $user->id)
         ->exists();
 });
+
+Broadcast::channel('user.{userId}', function ($user, $userId) {
+    return (int) $user->id === (int) $userId;
+});
