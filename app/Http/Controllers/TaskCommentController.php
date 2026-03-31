@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\TaskCommentCreated;
 use App\Models\ProjectMember;
 use App\Models\Task;
 use App\Models\TaskComment;
@@ -71,10 +72,14 @@ class TaskCommentController extends Controller
 
         $comment->load(['user', 'attachments']);
 
+        $formatted = $this->formatComment($comment);
+
+        broadcast(new TaskCommentCreated($formatted, $task->id))->toOthers();
+
         // Send notifications
         $this->sendNotifications($task, $comment);
 
-        return response()->json($this->formatComment($comment), 201);
+        return response()->json($formatted, 201);
     }
 
     /**

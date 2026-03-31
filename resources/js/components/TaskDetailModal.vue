@@ -2,6 +2,8 @@
 import { nextTick, ref, watch } from 'vue';
 import axios from 'axios';
 import DOMPurify from 'dompurify';
+import { usePage } from '@inertiajs/vue3';
+import type { Auth } from '@/types/auth';
 import {
     AlertCircle,
     Calendar,
@@ -28,12 +30,13 @@ interface TaskAttachment {
     is_image: boolean;
 }
 
-interface Comment {
-    id: number;
+interface LocalComment {
+    id: number | string;
     body: string;
     created_at: string;
     created_at_iso: string;
     is_mine: boolean;
+    sending: boolean;
     user: { id: number; name: string; initials: string };
     attachments: TaskAttachment[];
 }
@@ -64,14 +67,48 @@ const emit = defineEmits<{
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-const comments    = ref<Comment[]>([]);
-const loading     = ref(false);
-const submitting  = ref(false);
-const error       = ref('');
-const body        = ref('');
+const page         = usePage<{ auth: Auth }>();
+const comments     = ref<LocalComment[]>([]);
+const loading      = ref(false);
+const submitting   = ref(false);
+const error        = ref('');
+const body         = ref('');
 const pendingFiles = ref<File[]>([]);
-const fileInput   = ref<HTMLInputElement | null>(null);
-const commentEnd  = ref<HTMLDivElement | null>(null);
+const fileInput    = ref<HTMLInputElement | null>(null);
+const commentEnd   = ref<HTMLDivElement | null>(null);
+
+// ── Echo channel management ───────────────────────────────────────────────────
+
+let subscribedTaskId: number | null = null;
+
+function subscribeToTask(taskId: number) {
+    unsubscribeFromTask();
+    subscribedTaskId = taskId;
+    window.Echo.private(`task.${taskId}`).listen(
+        '.comment.created',
+        (event: { comment: LocalComment }) => {
+            if (event.comment.user.id === page.props.auth.user.id) return;
+            addCommentIfNotPresent(event.comment);
+        },
+    );
+}
+
+function unsubscribeFromTask() {
+    if (subscribedTaskId !== null) {
+        window.Echo.leave(`task.${subscribedTaskId}`);
+        subscribedTaskId = null;
+    }
+}
+
+function addCommentIfNotPresent(incoming: LocalComment) {
+    const already = comments.value.some(
+        (c) => typeof c.id === 'number' && c.id === incoming.id,
+    );
+    if (!already) {
+        comments.value.push({ ...incoming, sending: false });
+        nextTick(() => commentEnd.value?.scrollIntoView({ behavior: 'smooth' }));
+    }
+}
 
 // ── Watchers ──────────────────────────────────────────────────────────────────
 
@@ -84,6 +121,9 @@ watch(
             pendingFiles.value = [];
             error.value = '';
             await loadComments();
+            subscribeToTask(props.task.id);
+        } else {
+            unsubscribeFromTask();
         }
     },
 );
@@ -101,13 +141,21 @@ function sanitize(html: string): string {
     });
 }
 
+function getInitials(name: string): string {
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+}
+
 async function loadComments() {
     if (!props.task) return;
     loading.value = true;
     error.value = '';
     try {
-        const { data } = await axios.get<Comment[]>(`/tasks/${props.task.id}/comments`);
-        comments.value = data;
+        const { data } = await axios.get<LocalComment[]>(`/tasks/${props.task.id}/comments`);
+        comments.value = data.map((c) => ({ ...c, sending: false }));
         await nextTick();
         commentEnd.value?.scrollIntoView({ behavior: 'smooth' });
     } catch {
@@ -134,33 +182,67 @@ function removeFile(index: number) {
 async function submitComment() {
     if (!props.task || !body.value.trim()) return;
 
-    submitting.value = true;
     error.value = '';
 
+    // ── Optimistic UI: show comment immediately ──
+    const savedBody  = body.value;
+    const savedFiles = [...pendingFiles.value];
+    const tempId     = `opt-${Date.now()}`;
+    const currentUser = page.props.auth.user;
+
+    const optimisticComment: LocalComment = {
+        id:             tempId,
+        body:           savedBody,
+        created_at:     'Just now',
+        created_at_iso: new Date().toISOString(),
+        is_mine:        true,
+        sending:        true,
+        user:           { id: currentUser.id, name: currentUser.name, initials: getInitials(currentUser.name) },
+        attachments:    [],
+    };
+
+    comments.value.push(optimisticComment);
+    body.value = '';
+    pendingFiles.value = [];
+    emit('comment-added');
+    await nextTick();
+    commentEnd.value?.scrollIntoView({ behavior: 'smooth' });
+
+    // ── Send to server ──
+    submitting.value = true;
     const formData = new FormData();
-    formData.append('body', body.value);
-    pendingFiles.value.forEach((f, i) => formData.append(`attachments[${i}]`, f));
+    formData.append('body', savedBody);
+    savedFiles.forEach((f, i) => formData.append(`attachments[${i}]`, f));
+
+    const headers: Record<string, string> = { 'Content-Type': 'multipart/form-data' };
+    const socketId = window.Echo?.socketId?.() ?? null;
+    if (socketId) headers['X-Socket-ID'] = socketId;
 
     try {
-        const { data } = await axios.post<Comment>(
+        const { data } = await axios.post<LocalComment>(
             `/tasks/${props.task.id}/comments`,
             formData,
-            { headers: { 'Content-Type': 'multipart/form-data' } },
+            { headers },
         );
-        comments.value.push(data);
-        body.value = '';
-        pendingFiles.value = [];
-        emit('comment-added');
-        await nextTick();
-        commentEnd.value?.scrollIntoView({ behavior: 'smooth' });
+
+        // Replace optimistic comment with real server data
+        const index = comments.value.findIndex((c) => c.id === tempId);
+        if (index !== -1) {
+            comments.value[index] = { ...data, sending: false };
+        }
     } catch (err: any) {
-        error.value = err?.response?.data?.message ?? 'Failed to post comment.';
+        // Rollback: remove optimistic comment, restore form
+        comments.value = comments.value.filter((c) => c.id !== tempId);
+        body.value     = savedBody;
+        pendingFiles.value = savedFiles;
+        error.value    = err?.response?.data?.message ?? 'Failed to post comment.';
     } finally {
         submitting.value = false;
     }
 }
 
-async function deleteComment(comment: Comment) {
+async function deleteComment(comment: LocalComment) {
+    if (comment.sending) return;
     if (!confirm('Delete this comment?')) return;
     try {
         await axios.delete(`/task-comments/${comment.id}`);
@@ -286,7 +368,8 @@ function fileIcon(mime: string | null): boolean {
                             <div
                                 v-for="comment in comments"
                                 :key="comment.id"
-                                class="flex gap-3"
+                                class="flex gap-3 transition-opacity"
+                                :class="{ 'opacity-60': comment.sending }"
                             >
                                 <!-- Avatar -->
                                 <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white mt-0.5">
@@ -296,9 +379,11 @@ function fileIcon(mime: string | null): boolean {
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-2 mb-1">
                                         <span class="text-[12.5px] font-semibold text-gray-800">{{ comment.user.name }}</span>
-                                        <span class="text-[11px] text-gray-400">{{ comment.created_at }}</span>
+                                        <span class="text-[11px] text-gray-400">
+                                            {{ comment.sending ? 'Sending…' : comment.created_at }}
+                                        </span>
                                         <button
-                                            v-if="comment.is_mine"
+                                            v-if="comment.is_mine && !comment.sending"
                                             class="ml-auto rounded p-0.5 text-gray-300 transition hover:text-red-400"
                                             title="Delete comment"
                                             @click="deleteComment(comment)"

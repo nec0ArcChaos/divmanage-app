@@ -40,13 +40,27 @@ function syncFromPage() {
     }
 }
 
+let pollInterval: ReturnType<typeof setInterval> | null = null;
+
 onMounted(() => {
     syncFromPage();
     document.addEventListener('click', onClickOutside);
+
+    // Poll every 30 seconds to keep notification count fresh
+    pollInterval = setInterval(async () => {
+        try {
+            const { data } = await axios.get<NotificationsShared>('/notifications/counts');
+            items.value  = data.recent ?? [];
+            unread.value = data.unread_count ?? 0;
+        } catch {
+            // silently ignore polling errors
+        }
+    }, 30_000);
 });
 
 onUnmounted(() => {
     document.removeEventListener('click', onClickOutside);
+    if (pollInterval) clearInterval(pollInterval);
 });
 
 function onClickOutside(e: MouseEvent) {

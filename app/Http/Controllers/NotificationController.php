@@ -32,4 +32,22 @@ class NotificationController extends Controller
 
         return response()->json(['ok' => true]);
     }
+
+    /**
+     * Return current unread count and recent notifications for polling.
+     */
+    public function counts(): JsonResponse
+    {
+        $user = Auth::user();
+
+        return response()->json([
+            'unread_count' => $user->unreadNotifications()->count(),
+            'recent'       => $user->notifications()->latest()->take(15)->get()->map(fn ($n) => [
+                'id'         => $n->id,
+                'data'       => $n->data,
+                'read_at'    => $n->read_at,
+                'created_at' => $n->created_at->diffForHumans(),
+            ]),
+        ]);
+    }
 }
