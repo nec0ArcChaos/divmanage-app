@@ -90,7 +90,11 @@ function subscribeToTask(taskId: number) {
         '.comment.created',
         (event: { comment: LocalComment }) => {
             if (event.comment.user.id === page.props.auth.user.id) return;
-            addCommentIfNotPresent(event.comment);
+            // ambil is_mine dari receiving user, bukan sender
+            addCommentIfNotPresent({
+                ...event.comment,
+                is_mine: event.comment.user.id === page.props.auth.user.id,
+            });
         },
     );
 }
