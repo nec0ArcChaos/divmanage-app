@@ -48,8 +48,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Notifications
     Route::get('notifications/counts', [NotificationController::class, 'counts'])->name('notifications.counts');
-    Route::post('notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.readAll');
+    Route::post('notifications/read-by-task/{taskId}', [NotificationController::class, 'readByTask'])->name('notifications.readByTask');
+    Route::post('notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
 });
 
 require __DIR__.'/settings.php';

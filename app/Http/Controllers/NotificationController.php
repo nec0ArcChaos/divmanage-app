@@ -34,6 +34,20 @@ class NotificationController extends Controller
     }
 
     /**
+     * Mark all unread notifications for a specific task as read.
+     */
+    public function readByTask(int $taskId): JsonResponse
+    {
+        Auth::user()
+            ->unreadNotifications()
+            ->whereJsonContains('data->task_id', $taskId)
+            ->get()
+            ->markAsRead();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
      * Return current unread count and recent notifications for polling.
      */
     public function counts(): JsonResponse

@@ -67,15 +67,17 @@ const emit = defineEmits<{
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-const page         = usePage<{ auth: Auth }>();
-const comments     = ref<LocalComment[]>([]);
-const loading      = ref(false);
-const submitting   = ref(false);
-const error        = ref('');
-const body         = ref('');
-const pendingFiles = ref<File[]>([]);
-const fileInput    = ref<HTMLInputElement | null>(null);
-const commentEnd   = ref<HTMLDivElement | null>(null);
+const page          = usePage<{ auth: Auth }>();
+const comments      = ref<LocalComment[]>([]);
+const loading       = ref(false);
+const submitting    = ref(false);
+const error         = ref('');
+const body          = ref('');
+const pendingFiles  = ref<File[]>([]);
+const fileInput     = ref<HTMLInputElement | null>(null);
+const commentEnd    = ref<HTMLDivElement | null>(null);
+const dividerEl     = ref<HTMLDivElement | null>(null);
+const newFromIndex  = ref<number | null>(null);
 
 // ── Echo channel management ───────────────────────────────────────────────────
 
@@ -131,6 +133,10 @@ watch(
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function close() {
+    if (props.task) {
+        localStorage.setItem(`taskLastSeen:${props.task.id}`, new Date().toISOString());
+    }
+    newFromIndex.value = null;
     emit('update:modelValue', false);
 }
 
@@ -155,9 +161,24 @@ async function loadComments() {
     error.value = '';
     try {
         const { data } = await axios.get<LocalComment[]>(`/tasks/${props.task.id}/comments`);
-        comments.value = data.map((c) => ({ ...c, sending: false }));
+        const rawComments = data.map((c) => ({ ...c, sending: false }));
+        comments.value = rawComments;
+
+        // Determine where "new" messages start based on last visit
+        const lastSeen = localStorage.getItem(`taskLastSeen:${props.task.id}`);
+        if (lastSeen) {
+            const idx = rawComments.findIndex((c) => c.created_at_iso > lastSeen);
+            newFromIndex.value = idx >= 0 ? idx : null;
+        } else {
+            newFromIndex.value = null;
+        }
+
         await nextTick();
-        commentEnd.value?.scrollIntoView({ behavior: 'smooth' });
+        if (newFromIndex.value !== null) {
+            dividerEl.value?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            commentEnd.value?.scrollIntoView({ behavior: 'smooth' });
+        }
     } catch {
         error.value = 'Failed to load comments.';
     } finally {
@@ -204,6 +225,11 @@ async function submitComment() {
     comments.value.push(optimisticComment);
     body.value = '';
     pendingFiles.value = [];
+    // User is now caught up — save lastSeen and clear the divider
+    if (props.task) {
+        localStorage.setItem(`taskLastSeen:${props.task.id}`, new Date().toISOString());
+    }
+    newFromIndex.value = null;
     emit('comment-added');
     await nextTick();
     commentEnd.value?.scrollIntoView({ behavior: 'smooth' });
@@ -365,56 +391,69 @@ function fileIcon(mime: string | null): boolean {
 
                         <!-- Comment list -->
                         <div v-else class="space-y-5">
-                            <div
-                                v-for="comment in comments"
-                                :key="comment.id"
-                                class="flex gap-3 transition-opacity"
-                                :class="{ 'opacity-60': comment.sending }"
-                            >
-                                <!-- Avatar -->
-                                <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white mt-0.5">
-                                    {{ comment.user.initials }}
+                            <template v-for="(comment, index) in comments" :key="comment.id">
+                                <!-- "Latest Chat" divider -->
+                                <div
+                                    v-if="newFromIndex !== null && index === newFromIndex"
+                                    ref="dividerEl"
+                                    class="flex items-center gap-3 py-1"
+                                >
+                                    <div class="h-px flex-1 bg-blue-400/60" />
+                                    <span class="shrink-0 rounded-full bg-blue-50 px-2.5 py-0.5 text-[10.5px] font-semibold tracking-wide text-blue-500">
+                                        Latest Chat
+                                    </span>
+                                    <div class="h-px flex-1 bg-blue-400/60" />
                                 </div>
 
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <span class="text-[12.5px] font-semibold text-gray-800">{{ comment.user.name }}</span>
-                                        <span class="text-[11px] text-gray-400">
-                                            {{ comment.sending ? 'Sending…' : comment.created_at }}
-                                        </span>
-                                        <button
-                                            v-if="comment.is_mine && !comment.sending"
-                                            class="ml-auto rounded p-0.5 text-gray-300 transition hover:text-red-400"
-                                            title="Delete comment"
-                                            @click="deleteComment(comment)"
-                                        >
-                                            <Trash2 class="size-3.5" />
-                                        </button>
+                                <div
+                                    class="flex gap-3 transition-opacity"
+                                    :class="{ 'opacity-60': comment.sending }"
+                                >
+                                    <!-- Avatar -->
+                                    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white mt-0.5">
+                                        {{ comment.user.initials }}
                                     </div>
 
-                                    <!-- Comment body (sanitized HTML) -->
-                                    <div
-                                        class="comment-body rounded-lg border border-gray-100 bg-gray-50 px-3.5 py-2.5 text-[13px] text-gray-700"
-                                        v-html="sanitize(comment.body)"
-                                    />
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="text-[12.5px] font-semibold text-gray-800">{{ comment.user.name }}</span>
+                                            <span class="text-[11px] text-gray-400">
+                                                {{ comment.sending ? 'Sending…' : comment.created_at }}
+                                            </span>
+                                            <button
+                                                v-if="comment.is_mine && !comment.sending"
+                                                class="ml-auto rounded p-0.5 text-gray-300 transition hover:text-red-400"
+                                                title="Delete comment"
+                                                @click="deleteComment(comment)"
+                                            >
+                                                <Trash2 class="size-3.5" />
+                                            </button>
+                                        </div>
 
-                                    <!-- Attachments -->
-                                    <div v-if="comment.attachments.length > 0" class="mt-2 flex flex-wrap gap-2">
-                                        <a
-                                            v-for="att in comment.attachments"
-                                            :key="att.id"
-                                            :href="att.download_url"
-                                            target="_blank"
-                                            class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11.5px] text-gray-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-                                        >
-                                            <FileText v-if="!att.is_image" class="size-3.5 shrink-0 text-gray-400" />
-                                            <span class="max-w-[140px] truncate">{{ att.original_name }}</span>
-                                            <span class="shrink-0 text-gray-400">· {{ att.size_human }}</span>
-                                            <Download class="size-3 shrink-0 text-gray-400" />
-                                        </a>
+                                        <!-- Comment body (sanitized HTML) -->
+                                        <div
+                                            class="comment-body rounded-lg border border-gray-100 bg-gray-50 px-3.5 py-2.5 text-[13px] text-gray-700"
+                                            v-html="sanitize(comment.body)"
+                                        />
+
+                                        <!-- Attachments -->
+                                        <div v-if="comment.attachments.length > 0" class="mt-2 flex flex-wrap gap-2">
+                                            <a
+                                                v-for="att in comment.attachments"
+                                                :key="att.id"
+                                                :href="att.download_url"
+                                                target="_blank"
+                                                class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11.5px] text-gray-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                                            >
+                                                <FileText v-if="!att.is_image" class="size-3.5 shrink-0 text-gray-400" />
+                                                <span class="max-w-[140px] truncate">{{ att.original_name }}</span>
+                                                <span class="shrink-0 text-gray-400">· {{ att.size_human }}</span>
+                                                <Download class="size-3 shrink-0 text-gray-400" />
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            </template>
                         </div>
 
                         <div ref="commentEnd" />

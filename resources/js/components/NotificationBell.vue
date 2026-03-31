@@ -85,17 +85,24 @@ function onClickOutside(e: MouseEvent) {
 }
 
 async function markRead(item: NotificationItem) {
-    if (!item.read_at) {
-        try {
-            await axios.post(`/notifications/${item.id}/read`);
-            item.read_at = new Date().toISOString();
-            unread.value = Math.max(0, unread.value - 1);
-        } catch {
-            // silently ignore
+    const taskId = item.data.task_id;
+
+    // Optimistically mark ALL notifications from this task as read
+    const now = new Date().toISOString();
+    let freed = 0;
+    items.value.forEach((n) => {
+        if (n.data.task_id === taskId && !n.read_at) {
+            n.read_at = now;
+            freed++;
         }
-    }
+    });
+    unread.value = Math.max(0, unread.value - freed);
+
     open.value = false;
-    router.visit(`/projects?open_task=${item.data.task_id}&project_id=${item.data.project_id}`);
+    router.visit(`/projects?open_task=${taskId}&project_id=${item.data.project_id}`);
+
+    // Fire-and-forget — navigation already happened, no need to await
+    axios.post(`/notifications/read-by-task/${taskId}`).catch(() => {});
 }
 
 async function readAll() {
