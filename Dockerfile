@@ -55,7 +55,9 @@ COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
 COPY docker/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
+COPY docker/start.sh /start.sh
+RUN chmod +x /start.sh
 
 EXPOSE 8080
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/start.sh"]
