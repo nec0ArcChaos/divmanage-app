@@ -10,10 +10,14 @@ import Pusher from 'pusher-js';
 
 window.Pusher = Pusher;
 window.Echo = new Echo({
-    broadcaster: 'pusher',
-    key: import.meta.env.VITE_PUSHER_APP_KEY as string,
-    cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER as string,
-    forceTLS: true,
+    broadcaster: 'reverb',
+    key: import.meta.env.VITE_REVERB_APP_KEY as string,
+    wsHost: import.meta.env.VITE_REVERB_HOST as string,
+    wsPort: Number(import.meta.env.VITE_REVERB_PORT ?? 8080),
+    wssPort: Number(import.meta.env.VITE_REVERB_PORT ?? 8080),
+    forceTLS: (import.meta.env.VITE_REVERB_SCHEME as string) === 'https',
+    enabledTransports: ['ws', 'wss'],
+    disableStats: true,
     authorizer: (channel: { name: string }) => ({
         authorize: (socketId: string, callback: (error: boolean, data: unknown) => void) => {
             axios
