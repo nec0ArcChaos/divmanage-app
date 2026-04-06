@@ -3,8 +3,6 @@ FROM php:8.2-fpm-alpine AS base
 RUN apk add --no-cache \
     nginx \
     supervisor \
-    nodejs \
-    npm \
     curl \
     libpng-dev \
     libjpeg-turbo-dev \
@@ -38,14 +36,9 @@ RUN composer install \
     --optimize-autoloader \
     --prefer-dist
 
-COPY package.json package-lock.json ./
-RUN npm ci --include=optional
-
 COPY . .
 
 RUN composer run-script post-autoload-dump
-
-RUN npm run build && rm -rf node_modules
 
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/storage \
